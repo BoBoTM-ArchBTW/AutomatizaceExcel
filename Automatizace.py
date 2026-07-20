@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 import pandas as pd
+import numpy as np
 
 # Globální proměnné pro cesty a listy
 cesta_zakaznik = ""
@@ -11,9 +12,8 @@ cesta_cil = ""
 # Seznam pro uložení ovládacích prvků ze strany 2
 seznam_operaci = []
 
-# Seznamy sloupců, které naplní Pandas
+# Seznam sloupců zákazníka, který naplní Pandas
 sloupce_zakaznik = []
-sloupce_nase = []
 
 
 # --- AUTOMATICKÝ DETEKTOR ENGINŮ S FALLBACKEM ---
@@ -61,49 +61,31 @@ def vybrat_zakaznika():
         if listy:
             cb_list_zakaznik.set(listy[0])
             frame_list_zakaznik.pack(pady=(0, 15))
-            aktualizovat_parovani_zakaznika()
-
-def aktualizovat_parovani_zakaznika(event=None):
-    global sloupce_zakaznik
-    sloupce_zakaznik = nacist_sloupce_bezpecne(cesta_zakaznik, cb_list_zakaznik.get())
-    cb_klic_zakaznik['values'] = sloupce_zakaznik
-    if sloupce_zakaznik:
-        cb_klic_zakaznik.set(sloupce_zakaznik[0])
-        zobrazit_frame_parovani()
 
 
 def vybrat_cil():
     global cesta_cil
-    soubor = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xls *.xlsm")])
+    # Vynutíme ukládání pouze do standardního formátu .xlsx, aby to Excel neshazoval
+    soubor = filedialog.asksaveasfilename(
+        filetypes=[("Excel (.xlsx)", "*.xlsx")],
+        defaultextension=".xlsx",
+        initialdir=os.path.dirname(cesta_zakaznik) if cesta_zakaznik else None
+    )
     if soubor:
         cesta_cil = soubor
         lbl_cil.config(text=os.path.basename(soubor))
-        
-        listy = nacist_listy(soubor)
-        cb_list_cil['values'] = listy
-        if listy:
-            cb_list_cil.set(listy[0])
-            frame_list_cil.pack(pady=(0, 15))
-            aktualizovat_parovani_cile()
-
-def aktualizovat_parovani_cile(event=None):
-    global sloupce_nase
-    sloupce_nase = nacist_sloupce_bezpecne(cesta_cil, cb_list_cil.get())
-    cb_klic_cil['values'] = sloupce_nase
-    if sloupce_nase:
-        cb_klic_cil.set(sloupce_nase[0])
-        zobrazit_frame_parovani()
-
-
-def zobrazit_frame_parovani():
-    # Zobrazí panel pro výběr párovacích klíčů, pokud jsou načtené oba soubory
-    if cesta_zakaznik and cesta_cil:
-        frame_parovani.pack(pady=(15, 15))
 
 
 def prejit_na_operace():
+    global sloupce_zakaznik
     if not cesta_zakaznik or not cesta_cil:
-        messagebox.showwarning("Chyba", "Musíš vybrat soubor od zákazníka i váš cílový soubor!")
+        messagebox.showwarning("Chyba", "Musíš vybrat soubor od zákazníka i kam uložit výsledek!")
+        return
+    
+    sloupce_zakaznik = nacist_sloupce_bezpecne(cesta_zakaznik, cb_list_zakaznik.get())
+    
+    if not sloupce_zakaznik:
+        messagebox.showerror("Chyba", "Nepodařilo se načíst sloupce ze souboru.")
         return
 
     frame_strana1.pack_forget()
@@ -111,7 +93,20 @@ def prejit_na_operace():
     pridat_radek_operace()
 
 
-# --- STRÁNKA 2: DYNAMICKÝ SEZNAM ---
+# --- STRÁNKA 2 ---
+def dynamic_ui_zmeny(event, cb_operace, frame_z, frame_do, cb_odkud, cb_kam):
+    op = cb_operace.get()
+    if op == "Sečíst duplicitní řádky":
+        frame_z.config(text=" Podle kterého sloupce sloučit? ")
+        frame_do.pack_forget()
+        cb_odkud['values'] = sloupce_zakaznik
+    elif op == "Přičíst sloupec k jinému":
+        frame_z.config(text=" Zdrojový sloupec (S): ")
+        frame_do.pack(side=tk.LEFT, padx=5)
+        cb_odkud['values'] = sloupce_zakaznik
+        cb_kam['values'] = sloupce_zakaznik
+
+
 def pridat_radek_operace():
     radek_frame = ttk.Frame(scrollable_frame)
     radek_frame.pack(fill=tk.X, pady=5)
@@ -120,19 +115,25 @@ def pridat_radek_operace():
     cb_poradi.set(str(len(seznam_operaci) + 1))
     cb_poradi.pack(side=tk.LEFT, padx=5)
     
-    cb_operace = ttk.Combobox(radek_frame, values=["Kopírovat", "Sečíst", "Vydělit"], width=12, state="readonly")
-    cb_operace.set("Kopírovat")
+    dostupne_operace = ["Sečíst duplicitní řádky", "Přičíst sloupec k jinému"]
+    cb_operace = ttk.Combobox(radek_frame, values=dostupne_operace, width=22, state="readonly")
+    cb_operace.set("Sečíst duplicitní řádky")
     cb_operace.pack(side=tk.LEFT, padx=5)
     
-    ttk.Label(radek_frame, text="Z:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT, padx=(10, 2))
-    cb_odkud = ttk.Combobox(radek_frame, values=sloupce_zakaznik, width=25, state="readonly")
-    if sloupce_zakaznik: cb_odkud.set(sloupce_zakaznik[0])
-    cb_odkud.pack(side=tk.LEFT, padx=5)
+    frame_z = ttk.LabelFrame(radek_frame, text=" Podle kterého sloupce sloučit? ")
+    frame_z.pack(side=tk.LEFT, padx=5)
     
-    ttk.Label(radek_frame, text="Do:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT, padx=(20, 2))
-    cb_kam = ttk.Combobox(radek_frame, values=sloupce_nase, width=25, state="readonly")
-    if sloupce_nase: cb_kam.set(sloupce_nase[0])
-    cb_kam.pack(side=tk.LEFT, padx=5)
+    cb_odkud = ttk.Combobox(frame_z, values=sloupce_zakaznik, width=25, state="readonly")
+    if sloupce_zakaznik: cb_odkud.set(sloupce_zakaznik[0])
+    cb_odkud.pack(padx=5, pady=2)
+    
+    frame_do = ttk.LabelFrame(radek_frame, text=" Do kterého sloupce přičíst (R)? ")
+    
+    cb_kam = ttk.Combobox(frame_do, values=sloupce_zakaznik, width=25, state="readonly")
+    if sloupce_zakaznik: cb_kam.set(sloupce_zakaznik[0])
+    cb_kam.pack(padx=5, pady=2)
+    
+    cb_operace.bind("<<ComboboxSelected>>", lambda e: dynamic_ui_zmeny(e, cb_operace, frame_z, frame_do, cb_odkud, cb_kam))
     
     btn_smazat = ttk.Button(radek_frame, text="✕", width=3, command=lambda: smazat_radek_operace(radek_frame, data_radku))
     btn_smazat.pack(side=tk.RIGHT, padx=5)
@@ -154,59 +155,63 @@ def smazat_radek_operace(frame, data_radku):
         radek["poradi"].set(str(index + 1))
 
 
-# --- FINÁLNÍ MATICE A VÝPOČET ---
+# --- MOTOR AUTOMATIZACE ---
 def spustit_konverzi():
     try:
-        df_nase = None
-        df_zakaznik = None
-        
+        df = None
         for eng in ['openpyxl', 'xlrd', 'pyxlsb', 'calamine', None]:
             try:
-                if df_nase is None: df_nase = pd.read_excel(cesta_cil, sheet_name=cb_list_cil.get(), engine=eng)
-            except Exception: pass
-            try:
-                if df_zakaznik is None: df_zakaznik = pd.read_excel(cesta_zakaznik, sheet_name=cb_list_zakaznik.get(), engine=eng)
+                if df is None: 
+                    df = pd.read_excel(cesta_zakaznik, sheet_name=cb_list_zakaznik.get(), engine=eng)
             except Exception: pass
 
-        if df_nase is None or df_zakaznik is None:
-            messagebox.showerror("Chyba", "Nepodařilo se načíst data z tabulek.")
+        if df is None:
+            messagebox.showerror("Chyba", "Nepodařilo se načíst soubor zákazníka.")
             return
 
-        # Získání navolených klíčů pro párování z 1. stránky
-        klic_zak = cb_klic_zakaznik.get()
-        klic_nas = cb_klic_cil.get()
-
         serazene_operace = sorted(seznam_operaci, key=lambda x: int(x["poradi"].get() if x["poradi"].get().isdigit() else 99))
-        
-        # Klíčový moment: Spojení (merge) přesně podle vybraných sloupců s čísly součástek!
-        vysledek = pd.merge(df_nase, df_zakaznik, left_on=klic_nas, right_on=klic_zak, how="left")
 
         for radek in serazene_operace:
             op = radek["operace"].get()
             odkud = radek["odkud"].get()
             kam = radek["kam"].get()
             
-            if not odkud or not kam: continue
-            
-            if op == "Kopírovat":
-                vysledek[kam] = vysledek[odkud]
-            elif op == "Sečíst":
-                vysledek[kam] = pd.to_numeric(vysledek[kam], errors='coerce').fillna(0) + pd.to_numeric(vysledek[odkud], errors='coerce').fillna(0)
-            elif op == "Vydělit":
-                vysledek[kam] = pd.to_numeric(vysledek[kam], errors='coerce') / pd.to_numeric(vysledek[odkud], errors='coerce').replace(0, 1)
+            if not odkud: continue
 
-        # Ořízneme přebytečné sloupce od zákazníka, co se nabalily při merge, ať zůstane jen čistá struktura cíle
-        vysledek = vysledek[df_nase.columns]
+            if op == "Sečíst duplicitní řádky":
+                agg_dict = {}
+                for col in df.columns:
+                    if col == odkud:
+                        continue
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        agg_dict[col] = 'sum'
+                    else:
+                        agg_dict[col] = 'first'
+                
+                df = df.groupby(odkud, as_index=False).agg(agg_dict)
 
-        is_xlsm = cesta_cil.lower().endswith('.xlsm')
-        with pd.ExcelWriter(cesta_cil, engine='openpyxl', engine_kwargs={'keep_vba': True} if is_xlsm else {}) as writer:
-            vysledek.to_excel(writer, index=False, sheet_name=cb_list_cil.get())
+            elif op == "Přičíst sloupec k jinému":
+                if not kam: continue
+                Zdroj_S = pd.to_numeric(df[odkud], errors='coerce').fillna(0)
+                Cil_R = pd.to_numeric(df[kam], errors='coerce').fillna(0)
+                df[kam] = Cil_R + Zdroj_S
 
-        messagebox.showinfo("Hotovo", "Všechny kroky úspěšně proběhly a data byla uložena!")
+        # Bezpečné ošetření přípony – vynutíme uložení do čistého .xlsx
+        vystupni_cesta = cesta_cil
+        if vystupni_cesta.lower().endswith('.xlsm'):
+            vystupni_cesta = wystupni_cesta[:-5] + ".xlsx"
+        elif vystupni_cesta.lower().endswith('.xls'):
+            vystupni_cesta = vystupni_cesta[:-4] + ".xlsx"
+
+        # Uložíme jako standardní moderní xlsx (vždy čistý zip/xml, který Excel schválí)
+        with pd.ExcelWriter(vystupni_cesta, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name=cb_list_zakaznik.get())
+
+        messagebox.showinfo("Hotovo", f"Uloženo jako čistý sešit:\n{os.path.basename(vystupni_cesta)}")
         root.destroy()
 
     except Exception as e:
-        messagebox.showerror("Chyba při zápisu", f"Něco kleklo:\n{str(e)}")
+        messagebox.showerror("Chyba při zpracování", f"Něco kleklo v Pandas:\n{str(e)}")
 
 
 def navrat_zpet():
@@ -219,7 +224,7 @@ def navrat_zpet():
 # ================= HLAVNÍ OKNO =================
 root = tk.Tk()
 root.title("Automatizace tabulek")
-root.geometry("850x600")
+root.geometry("850x550")
 
 style = ttk.Style()
 style.theme_use('vista')
@@ -228,44 +233,22 @@ style.theme_use('vista')
 frame_strana1 = ttk.Frame(root, padding="20")
 frame_strana1.pack(fill=tk.BOTH, expand=True)
 
-# 1. Zákazník
-ttk.Label(frame_strana1, text="1. Vyber soubor od zákazníka", font=("Segoe UI", 10, "bold")).pack(pady=(5, 5))
-ttk.Button(frame_strana1, text="Procházet zákazníka...", command=vybrat_zakaznika).pack()
+ttk.Label(frame_strana1, text="1. Vyber soubor od zákazníka, který chceš opravit", font=("Segoe UI", 10, "bold")).pack(pady=(15, 5))
+ttk.Button(frame_strana1, text="Procházet soubor...", command=vybrat_zakaznika).pack()
 lbl_zakaznik = ttk.Label(frame_strana1, text="Není vybráno", font=("Segoe UI", 9, "italic"))
 lbl_zakaznik.pack(pady=(0, 5))
 
 frame_list_zakaznik = ttk.Frame(frame_strana1)
-ttk.Label(frame_list_zakaznik, text="Vyber list zákazníka:").pack(side=tk.LEFT, padx=5)
+ttk.Label(frame_list_zakaznik, text="Vyber list tabulky:").pack(side=tk.LEFT, padx=5)
 cb_list_zakaznik = ttk.Combobox(frame_list_zakaznik, width=25, state="readonly")
 cb_list_zakaznik.pack(side=tk.LEFT)
-cb_list_zakaznik.bind("<<ComboboxSelected>>", aktualizovat_parovani_zakaznika)
 
-# 2. Váš cílový soubor
-ttk.Label(frame_strana1, text="2. Vyber váš soubor (kam uložit výsledek)", font=("Segoe UI", 10, "bold")).pack(pady=(15, 5))
-ttk.Button(frame_strana1, text="Vybrat cíl...", command=vybrat_cil).pack()
+ttk.Label(frame_strana1, text="2. Kam uložit opravený výsledek?", font=("Segoe UI", 10, "bold")).pack(pady=(25, 5))
+ttk.Button(frame_strana1, text="Určit název nového souboru...", command=vybrat_cil).pack()
 lbl_cil = ttk.Label(frame_strana1, text="Není vybráno", font=("Segoe UI", 9, "italic"))
-lbl_cil.pack(pady=(0, 5))
+lbl_cil.pack(pady=(0, 30))
 
-frame_list_cil = ttk.Frame(frame_strana1)
-ttk.Label(frame_list_cil, text="Vyber cílový list:").pack(side=tk.LEFT, padx=5)
-cb_list_cil = ttk.Combobox(frame_list_cil, width=25, state="readonly")
-cb_list_cil.pack(side=tk.LEFT)
-cb_list_cil.bind("<<ComboboxSelected>>", aktualizovat_parovani_cile)
-
-# --- DYNAMICKÝ PANEL PRO PÁROVÁNÍ ---
-frame_parovani = ttk.LabelFrame(frame_strana1, text=" Nastavení párování řádků (Čísla součástek) ", padding="10")
-# Balí se automaticky až po načtení obou souborů
-
-ttk.Label(frame_parovani, text="Sloupec s klíčem u zákazníka:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-cb_klic_zakaznik = ttk.Combobox(frame_parovani, width=30, state="readonly")
-cb_klic_zakaznik.grid(row=0, column=1, padx=5, pady=5)
-
-ttk.Label(frame_parovani, text="Sloupec s klíčem u nás:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-cb_klic_cil = ttk.Combobox(frame_parovani, width=30, state="readonly")
-cb_klic_cil.grid(row=1, column=1, padx=5, pady=5)
-
-# Tlačítko Pokračovat
-ttk.Button(frame_strana1, text="Pokračovat ➔", command=prejit_na_operace).pack(fill=tk.X, side=tk.BOTTOM, ipady=7)
+ttk.Button(frame_strana1, text="Pokračovat do nastavení kroků ➔", command=prejit_na_operace).pack(fill=tk.X, ipady=7)
 
 # ================= STRÁNKA 2 =================
 frame_strana2 = ttk.Frame(root, padding="15")
