@@ -1,0 +1,43 @@
+{
+    "Test": {
+        "popis": "Funguje to :D",
+        "kroky": [
+            {
+                "operace": "Přesunout/kopírovat data do naší tabulky",
+                "mapovani_rules": [],
+                "klic1": "",
+                "klic2": "",
+                "tabulka": "Soubor Eolix",
+                "vybrany_sloupec": "",
+                "hodnota_naplneni": ""
+            },
+            {
+                "operace": "Vyčistit sloupec",
+                "mapovani_rules": [],
+                "klic1": "",
+                "klic2": "",
+                "tabulka": "Soubor Eolix",
+                "vybrany_sloupec": "",
+                "hodnota_naplneni": ""
+            },
+            {
+                "operace": "Naplnit sloupec",
+                "mapovani_rules": [],
+                "klic1": "",
+                "klic2": "",
+                "tabulka": "Soubor Eolix",
+                "vybrany_sloupec": "",
+                "hodnota_naplneni": ""
+            },
+            {
+                "operace": "Přičíst sloupec k jinému",
+                "mapovani_rules": [],
+                "klic1": "",
+                "klic2": "",
+                "tabulka": "Soubor Eolix",
+                "vybrany_sloupec": "",
+                "hodnota_naplneni": ""
+            }
+        ]
+    }
+}
