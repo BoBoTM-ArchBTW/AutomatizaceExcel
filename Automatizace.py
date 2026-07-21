@@ -4,7 +4,7 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 import pandas as pd
 
-# Globální proměnné pro cesty a listy
+# Globální proměnné pro cesty
 cesta_zakaznik = ""
 cesta_nas = ""
 cesta_cil = ""
@@ -34,16 +34,17 @@ def nacist_listy(cesta_souboru):
         return []
 
 
-def nacist_sloupce_bezpecne(cesta, list_name):
+def nacist_sloupce_s_headerem(cesta, list_name, header_row_index):
+    """Načte názvy sloupců s tím, že header_row_index udává 0-based index řádku záhlaví."""
     enginy = ['openpyxl', 'xlrd', 'pyxlsb', 'calamine']
     for eng in enginy:
         try:
-            df = pd.read_excel(cesta, sheet_name=list_name, nrows=0, engine=eng)
+            df = pd.read_excel(cesta, sheet_name=list_name, header=header_row_index, nrows=0, engine=eng)
             return list(df.columns)
         except Exception:
             continue
     try:
-        df = pd.read_excel(cesta, sheet_name=list_name, nrows=0)
+        df = pd.read_excel(cesta, sheet_name=list_name, header=header_row_index, nrows=0)
         return list(df.columns)
     except Exception:
         return []
@@ -61,7 +62,7 @@ def vybrat_zakaznika():
         cb_list_zakaznik['values'] = listy
         if listy:
             cb_list_zakaznik.set(listy[0])
-            frame_list_zakaznik.pack(pady=(0, 10))
+            frame_list_zakaznik.pack(pady=(0, 5))
 
 
 def vybrat_nas_soubor():
@@ -75,7 +76,7 @@ def vybrat_nas_soubor():
         cb_list_nas['values'] = listy
         if listy:
             cb_list_nas.set(listy[0])
-            frame_list_nas.pack(pady=(0, 10))
+            frame_list_nas.pack(pady=(0, 5))
 
 
 def vybrat_cil():
@@ -90,22 +91,45 @@ def vybrat_cil():
         lbl_cil.config(text=os.path.basename(soubor))
 
 
-def prejit_na_operace():
-    global sloupce_zakaznik, sloupce_nase
+def prejit_na_stranku_1_5():
     if not cesta_zakaznik or not cesta_nas or not cesta_cil:
         messagebox.showwarning("Chyba", "Musíš vybrat soubor zákazníka, náš soubor i cíl pro uložení!")
         return
-    
-    sloupce_zakaznik = nacist_sloupce_bezpecne(cesta_zakaznik, cb_list_zakaznik.get())
-    sloupce_nase = nacist_sloupce_bezpecne(cesta_nas, cb_list_nas.get())
-    
+
+    frame_strana1.pack_forget()
+    frame_strana1_5.pack(fill=tk.BOTH, expand=True)
+    nacteni_sloupců_strana1_5()
+
+
+# --- AKCE NA STRÁNCE 1.5 ---
+def nacteni_sloupců_strana1_5(event=None):
+    global sloupce_zakaznik, sloupce_nase
+    try:
+        hdr_zak = int(sp_hdr_zakaznik.get()) - 1
+        hdr_nas = int(sp_hdr_nas.get()) - 1
+    except ValueError:
+        hdr_zak = 0
+        hdr_nas = 0
+
+    sloupce_zakaznik = nacist_sloupce_s_headerem(cesta_zakaznik, cb_list_zakaznik.get(), hdr_zak)
+    sloupce_nase = nacist_sloupce_s_headerem(cesta_nas, cb_list_nas.get(), hdr_nas)
+
+    cb_klic_zakaznik['values'] = sloupce_zakaznik
+    if sloupce_zakaznik: cb_klic_zakaznik.set(sloupce_zakaznik[0])
+
+    cb_klic_nas['values'] = sloupce_nase
+    if sloupce_nase: cb_klic_nas.set(sloupce_nase[0])
+
+
+def prejit_na_operace():
     if not sloupce_zakaznik or not sloupce_nase:
         messagebox.showerror("Chyba", "Nepodařilo se načíst sloupce ze souborů.")
         return
 
-    frame_strana1.pack_forget()
+    frame_strana1_5.pack_forget()
     frame_strana2.pack(fill=tk.BOTH, expand=True)
-    pridat_radek_operace()
+    if not seznam_operaci:
+        pridat_radek_operace()
 
 
 # --- POP-UP OKNO PRO MAPOVÁNÍ SLOUPCŮ ---
@@ -113,11 +137,10 @@ def otevrit_popup_mapovani(data_radku):
     popup = tk.Toplevel(root)
     popup.title("Nastavení mapování sloupců")
     popup.geometry("550x500")
-    popup.grab_set()  # Uzamkne okno, dokud se nezavře
+    popup.grab_set()
 
     ttk.Label(popup, text="Kopírovat vybrané sloupce ze zákaznického souboru do našeho", font=("Segoe UI", 10, "bold")).pack(pady=10)
 
-    # Scrollable oblast v popu
     pop_canvas = tk.Canvas(popup, borderwidth=0, highlightthickness=0)
     pop_scrollbar = ttk.Scrollbar(popup, orient="vertical", command=pop_canvas.yview)
     pop_scroll_frame = ttk.Frame(pop_canvas)
@@ -159,23 +182,21 @@ def otevrit_popup_mapovani(data_radku):
         frame.destroy()
         ui_mapovani_prvky.remove(dvojice_data)
 
-    # Načteme existující pravidla, pokud už byla dříve vytvořena
     if mapovani_seznam:
         for r in mapovani_seznam:
             pridat_dvojici_sloupců(r["src"], r["dst"])
     else:
         pridat_dvojici_sloupců()
 
-    # Spodní část pop-upu pro výběr konce dat a tlačítko uložit
     bot_frame = ttk.Frame(popup, padding=10)
     bot_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
     ttk.Button(bot_frame, text="+ Přidat další sloupec", command=lambda: pridat_dvojici_sloupců()).pack(anchor=tk.W, pady=(0, 10))
 
-    frame_konec = ttk.LabelFrame(bot_frame, text=" Určení konce dat ", padding=5)
+    frame_konec = ttk.LabelFrame(bot_frame, text=" Určení konce dat u zákazníka ", padding=5)
     frame_konec.pack(fill=tk.X, pady=5)
 
-    ttk.Label(frame_konec, text="Kopírovat řádky 2 až po konec sloupce:").pack(side=tk.LEFT, padx=5)
+    ttk.Label(frame_konec, text="Kopírovat data po konec sloupce:").pack(side=tk.LEFT, padx=5)
     cb_konec_col = ttk.Combobox(frame_konec, values=sloupce_zakaznik, width=25, state="readonly")
     if sloupce_zakaznik:
         cb_konec_col.set(data_radku.get("konec_podle_sloupce", sloupce_zakaznik[0]))
@@ -277,14 +298,17 @@ def spustit_konverzi():
         df_zak = None
         df_nas = None
         
+        hdr_zak_idx = int(sp_hdr_zakaznik.get()) - 1
+        hdr_nas_idx = int(sp_hdr_nas.get()) - 1
+
         for eng in ['openpyxl', 'xlrd', 'pyxlsb', 'calamine', None]:
             try:
                 if df_zak is None:
-                    df_zak = pd.read_excel(cesta_zakaznik, sheet_name=cb_list_zakaznik.get(), engine=eng)
+                    df_zak = pd.read_excel(cesta_zakaznik, sheet_name=cb_list_zakaznik.get(), header=hdr_zak_idx, engine=eng)
             except Exception: pass
             try:
                 if df_nas is None:
-                    df_nas = pd.read_excel(cesta_nas, sheet_name=cb_list_nas.get(), engine=eng)
+                    df_nas = pd.read_excel(cesta_nas, sheet_name=cb_list_nas.get(), header=hdr_nas_idx, engine=eng)
             except Exception: pass
 
         if df_zak is None or df_nas is None:
@@ -322,20 +346,27 @@ def spustit_konverzi():
                 if not pravidla or not konec_col:
                     continue
 
-                # Zjistíme poslední platný řádek ve vybraném určujícím sloupci (ignorueme NaN)
+                # Ořízneme zákaznická data po konec určeného sloupce
                 posledni_index = df_zak[konec_col].dropna().index.max()
-                
                 if pd.isna(posledni_index):
                     posledni_index = len(df_zak) - 1
 
-                # Ořízneme zákaznická data od řádku 0 (v Excelu řádek 2, protože hlavička je řádek 1) po konec
                 df_zak_oriznuto = df_zak.loc[0:posledni_index]
 
-                # Nakopírujeme hodnoty z vybraných zákaznických sloupců do našich cílových sloupců
+                # Náš párovací klíč a zákaznický párovací klíč ze Stránky 1.5
+                klic_zak = cb_klic_zakaznik.get()
+                klic_nas = cb_klic_nas.get()
+
+                # Vytvoříme si mapovací slovníky ze zákaznických dat podle klíče
                 for rule in pravidla:
-                    src_s = rule["src"]
-                    dst_s = rule["dst"]
-                    df_nas[dst_s] = df_zak_oriznuto[src_s]
+                    src_col = rule["src"]
+                    dst_col = rule["dst"]
+
+                    # Vytvoříme převodní mapu: [Klíč Zákazníka] -> [Hodnota ve zdrojovém sloupci]
+                    mapa_hodnot = dict(zip(df_zak_oriznuto[klic_zak], df_zak_oriznuto[src_col]))
+
+                    # Připíšeme/přepíšeme hodnoty v naší tabulce tam, kde se klíče shodují!
+                    df_nas[dst_col] = df_nas[klic_nas].map(mapa_hodnot).fillna(df_nas[dst_col])
 
         # Vynutíme uložení do čistého .xlsx
         vystupni_cesta = cesta_cil
@@ -354,17 +385,22 @@ def spustit_konverzi():
         messagebox.showerror("Chyba při zpracování", f"Něco kleklo v Pandas:\n{str(e)}")
 
 
+def navrat_z_1_5():
+    frame_strana1_5.pack_forget()
+    frame_strana1.pack(fill=tk.BOTH, expand=True)
+
+
 def navrat_zpet():
     for radek in seznam_operaci: radek["frame"].destroy()
     seznam_operaci.clear()
     frame_strana2.pack_forget()
-    frame_strana1.pack(fill=tk.BOTH, expand=True)
+    frame_strana1_5.pack(fill=tk.BOTH, expand=True)
 
 
 # ================= HLAVNÍ OKNO =================
 root = tk.Tk()
 root.title("Automatizace tabulek")
-root.geometry("850x600")
+root.geometry("1050x600")
 
 style = ttk.Style()
 style.theme_use('vista')
@@ -373,7 +409,6 @@ style.theme_use('vista')
 frame_strana1 = ttk.Frame(root, padding="20")
 frame_strana1.pack(fill=tk.BOTH, expand=True)
 
-# 1. Zákazník
 ttk.Label(frame_strana1, text="1. Vyber soubor od zákazníka", font=("Segoe UI", 10, "bold")).pack(pady=(5, 2))
 ttk.Button(frame_strana1, text="Procházet zákazníka...", command=vybrat_zakaznika).pack()
 lbl_zakaznik = ttk.Label(frame_strana1, text="Není vybráno", font=("Segoe UI", 9, "italic"))
@@ -384,7 +419,6 @@ ttk.Label(frame_list_zakaznik, text="Vyber list zákazníka:").pack(side=tk.LEFT
 cb_list_zakaznik = ttk.Combobox(frame_list_zakaznik, width=25, state="readonly")
 cb_list_zakaznik.pack(side=tk.LEFT)
 
-# 2. Náš soubor
 ttk.Label(frame_strana1, text="2. Vyber náš firemní soubor (šablonu)", font=("Segoe UI", 10, "bold")).pack(pady=(10, 2))
 ttk.Button(frame_strana1, text="Procházet náš soubor...", command=vybrat_nas_soubor).pack()
 lbl_nas = ttk.Label(frame_strana1, text="Není vybráno", font=("Segoe UI", 9, "italic"))
@@ -395,13 +429,55 @@ ttk.Label(frame_list_nas, text="Vyber náš list:").pack(side=tk.LEFT, padx=5)
 cb_list_nas = ttk.Combobox(frame_list_nas, width=25, state="readonly")
 cb_list_nas.pack(side=tk.LEFT)
 
-# 3. Cíl
 ttk.Label(frame_strana1, text="3. Kam uložit opravený výsledek?", font=("Segoe UI", 10, "bold")).pack(pady=(10, 2))
 ttk.Button(frame_strana1, text="Určit název nového souboru...", command=vybrat_cil).pack()
 lbl_cil = ttk.Label(frame_strana1, text="Není vybráno", font=("Segoe UI", 9, "italic"))
 lbl_cil.pack(pady=(0, 15))
 
-ttk.Button(frame_strana1, text="Pokračovat do nastavení kroků ➔", command=prejit_na_operace).pack(fill=tk.X, ipady=7)
+ttk.Button(frame_strana1, text="Pokračovat k nastavení tabulek ➔", command=prejit_na_stranku_1_5).pack(fill=tk.X, ipady=7)
+
+
+# ================= STRÁNKA 1.5 =================
+frame_strana1_5 = ttk.Frame(root, padding="20")
+
+ttk.Label(frame_strana1_5, text="Nastavení řádků záhlaví a párování", font=("Segoe UI", 11, "bold")).pack(anchor=tk.W, pady=(0, 15))
+
+# 1. Řádky záhlaví
+frame_hdr = ttk.LabelFrame(frame_strana1_5, text=" Na kterém řádku je v tabulce záhlaví (název sloupců)? ", padding="10")
+frame_hdr.pack(fill=tk.X, pady=(0, 15))
+
+ttk.Label(frame_hdr, text="Řádek záhlaví u zákazníka:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+sp_hdr_zakaznik = ttk.Spinbox(frame_hdr, from_=1, to=100, width=5)
+sp_hdr_zakaznik.set(1)
+sp_hdr_zakaznik.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+
+ttk.Label(frame_hdr, text="Řádek záhlaví v naší šabloně:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+sp_hdr_nas = ttk.Spinbox(frame_hdr, from_=1, to=100, width=5)
+sp_hdr_nas.set(1)
+sp_hdr_nas.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
+
+# Tlačítko pro obnovení sloupců při změně záhlaví
+ttk.Button(frame_hdr, text="Obnovit sloupce podle zadaných řádků", command=nacteni_sloupců_strana1_5).grid(row=2, column=0, columnspan=2, pady=10)
+
+# 2. Párovací klíče
+frame_keys = ttk.LabelFrame(frame_strana1_5, text=" Párování řádků (Čísla součástek / Kódy) ", padding="10")
+frame_keys.pack(fill=tk.X, pady=(0, 20))
+
+ttk.Label(frame_keys, text="Sloupec s kódem u zákazníka:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+cb_klic_zakaznik = ttk.Combobox(frame_keys, width=30, state="readonly")
+cb_klic_zakaznik.grid(row=0, column=1, padx=5, pady=5)
+
+ttk.Label(frame_keys, text="Sloupec s kódem u nás:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+cb_klic_nas = ttk.Combobox(frame_keys, width=30, state="readonly")
+cb_klic_nas.grid(row=1, column=1, padx=5, pady=5)
+
+# Navigační tlačítka dole
+nav_frame_1_5 = ttk.Frame(frame_strana1_5)
+nav_frame_1_5.pack(fill=tk.X, side=tk.BOTTOM)
+
+ttk.Button(nav_frame_1_5, text="⮌ Zpět", command=navrat_z_1_5).pack(side=tk.LEFT, ipady=5)
+ttk.Button(nav_frame_1_5, text="Pokračovat k automatizaci ➔", command=prejit_na_operace).pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(10, 0), ipady=5)
+
 
 # ================= STRÁNKA 2 =================
 frame_strana2 = ttk.Frame(root, padding="15")
