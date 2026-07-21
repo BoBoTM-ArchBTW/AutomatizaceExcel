@@ -90,7 +90,6 @@ def prejit_na_pracovni_plochu():
         messagebox.showerror("Chyba", "Nepodařilo se načíst sloupce ze souborů.")
         return
 
-    # Naplnění párovacích dropdownů na hlavní ploše
     cb_klic_zakaznik["values"] = sloupce_zakaznik
     cb_klic_zakaznik.set(sloupce_zakaznik[0])
 
@@ -264,6 +263,28 @@ def otevrit_popup_operace(data_radku):
         ttk.Button(frame_main, text="Uložit", command=ulozit_sloupec).pack(side=tk.BOTTOM, fill=tk.X, ipady=4)
 
 
+# --- CHYTRÉ PŘESKLÁDÁNÍ A PŘEPOČET ČÍSEL BEZ DUPLICIT ---
+def preskladat_radky_operaci(event=None, meneny_radek=None):
+    if meneny_radek:
+        try:
+            nova_pozice = int(meneny_radek["poradi"].get())
+            # Vyjmeme měněný řádek a vložíme ho přesně na požadovaný index
+            seznam_operaci.remove(meneny_radek)
+            seznam_operaci.insert(nova_pozice - 1, meneny_radek)
+        except ValueError:
+            pass
+
+    # Automaticky přepíšeme pořadová čísla v dropdownu pro všechny kroky (1, 2, 3...)
+    for index, radek in enumerate(seznam_operaci):
+        radek["poradi"].set(str(index + 1))
+        radek["frame"].config(text=f" Krok {index + 1} ")
+        radek["frame"].pack_forget()
+        radek["frame"].pack(fill=tk.X, pady=4, padx=5)
+
+    canvas.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
+
 # --- STRÁNKA 2: DYNAMICKÝ SEZNAM KROKŮ ---
 def zmena_operace(cb_operace, btn_upravit, data_radku):
     op = cb_operace.get()
@@ -277,7 +298,7 @@ def pridat_radek_operace():
     radek_frame = ttk.LabelFrame(scrollable_frame, text=f" Krok {len(seznam_operaci) + 1} ", padding=8)
     radek_frame.pack(fill=tk.X, pady=4, padx=5)
 
-    cb_poradi = ttk.Combobox(radek_frame, values=[str(i) for i in range(1, 31)], width=3)
+    cb_poradi = ttk.Combobox(radek_frame, values=[str(i) for i in range(1, 31)], width=3, state="readonly")
     cb_poradi.set(str(len(seznam_operaci) + 1))
     cb_poradi.pack(side=tk.LEFT, padx=(5, 10))
 
@@ -301,6 +322,9 @@ def pridat_radek_operace():
         "klic2": "", "tabulka": "Náš firemní soubor", "vybrany_sloupec": "", "hodnota_naplneni": ""
     }
 
+    # Při změně pořadí automaticky upravíme celý seznam kroků
+    cb_poradi.bind("<<ComboboxSelected>>", lambda e: preskladat_radky_operaci(e, data_radku))
+
     zmena_operace(cb_operace, btn_upravit, data_radku)
     cb_operace.bind("<<ComboboxSelected>>", lambda e: zmena_operace(cb_operace, btn_upravit, data_radku))
 
@@ -308,16 +332,13 @@ def pridat_radek_operace():
     btn_smazat.pack(side=tk.RIGHT, padx=5)
 
     seznam_operaci.append(data_radku)
-    canvas.update_idletasks()
-    canvas.configure(scrollregion=canvas.bbox("all"))
+    preskladat_radky_operaci()
 
 
 def smazat_radek_operace(frame, data_radku):
     frame.destroy()
     seznam_operaci.remove(data_radku)
-    for index, radek in enumerate(seznam_operaci):
-        radek["frame"].config(text=f" Krok {index + 1} ")
-        radek["poradi"].set(str(index + 1))
+    preskladat_radky_operaci()
 
 
 # --- MOTOR AUTOMATIZACE (PANDAS) ---
@@ -333,9 +354,7 @@ def spustit_konverzi():
             messagebox.showerror("Chyba", "Nepodařilo se načíst vstupní Excel soubory.")
             return
 
-        serazene_operace = sorted(seznam_operaci, key=lambda x: int(x["poradi"].get() if x["poradi"].get().isdigit() else 99))
-
-        for radek in serazene_operace:
+        for radek in seznam_operaci:
             op = radek["operace"].get()
 
             if op == "Sečíst duplicitní řádky":
