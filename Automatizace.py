@@ -165,7 +165,7 @@ def prejit_na_pracovni_plochu():
 def otevrit_popup_mapovani(data_radku):
     popup = tk.Toplevel(root)
     popup.title("Mapování sloupců pro přesun")
-    popup.geometry("620x520")
+    popup.geometry("600x500")
     popup.grab_set()
 
     ttk.Label(
@@ -182,9 +182,10 @@ def otevrit_popup_mapovani(data_radku):
         "<Configure>",
         lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
     )
-    canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
-    canvas.configure(yscrollcommand=scrollbar.set)
+    pop_canvas_win = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    canvas.bind("<Configure>", lambda e: canvas.itemconfig(pop_canvas_win, width=e.width))
 
+    canvas.configure(yscrollcommand=scrollbar.set)
     pripojit_scrollovani_koleckem(canvas)
 
     canvas.pack(side="top", fill="both", expand=True, padx=10, pady=5)
@@ -196,7 +197,7 @@ def otevrit_popup_mapovani(data_radku):
         f = ttk.LabelFrame(
             scroll_frame, text=f" Pravidlo {len(ui_prvky) + 1} ", padding=8
         )
-        f.pack(fill=tk.X, pady=4, padx=5)
+        f.pack(fill=tk.X, expand=True, pady=4, padx=5)
 
         ttk.Label(f, text="Zdroj:").grid(
             row=0, column=0, sticky=tk.W, padx=5
@@ -463,8 +464,7 @@ def otevrit_popup_nacist_profil():
 
     popup = tk.Toplevel(root)
     popup.title("Správa a načítání profilů")
-    # Zvětšeno pro mnohem lepší čitelnost
-    popup.geometry("650x500")
+    popup.geometry("560x440")
     popup.grab_set()
 
     ttk.Label(popup, text="Uložené konfigurace operací:", font=("Segoe UI", 11, "bold")).pack(anchor=tk.W, padx=15, pady=10)
@@ -474,7 +474,10 @@ def otevrit_popup_nacist_profil():
     scroll_frame = ttk.Frame(canvas)
 
     scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    
+    pop_win_id = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    canvas.bind("<Configure>", lambda e: canvas.itemconfig(pop_win_id, width=e.width))
+
     canvas.configure(yscrollcommand=scrollbar.set)
     pripojit_scrollovani_koleckem(canvas)
 
@@ -492,14 +495,21 @@ def otevrit_popup_nacist_profil():
 
         for p_nazev, p_data in aktualni_profily.items():
             box = ttk.LabelFrame(scroll_frame, text=f" {p_nazev} ", padding=10)
-            box.pack(fill=tk.X, pady=6, padx=5)
+            box.pack(fill=tk.X, expand=True, pady=6, padx=5)
 
-            # Čitelnější název popisu
             popis_text = p_data.get('popis', 'Bez popisu')
             if not popis_text:
                 popis_text = "Bez popisu"
 
-            lbl_p = ttk.Label(box, text=f"Popis: {popis_text}", font=("Segoe UI", 9, "italic"), foreground="#444444")
+            # PŘIDÁNO: wraplength=480 a justify pro automatické zalamování dlouhého popisu na nové řádky
+            lbl_p = ttk.Label(
+                box,
+                text=f"Popis: {popis_text}",
+                font=("Segoe UI", 9, "italic"),
+                foreground="#444444",
+                wraplength=480,
+                justify="left"
+            )
             lbl_p.pack(anchor=tk.W, pady=(0, 8))
 
             btns_frame = ttk.Frame(box)
@@ -611,7 +621,7 @@ def preskladat_radky_operaci(event=None, meneny_radek=None):
         radek["poradi"].set(str(index + 1))
         radek["frame"].config(text=f" Krok {index + 1} ")
         radek["frame"].pack_forget()
-        radek["frame"].pack(fill=tk.X, pady=4, padx=5)
+        radek["frame"].pack(fill=tk.X, expand=True, pady=4, padx=5)
 
     canvas.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
@@ -636,7 +646,7 @@ def pridat_radek_operace():
     radek_frame = ttk.LabelFrame(
         scrollable_frame, text=f" Krok {len(seznam_operaci) + 1} ", padding=8
     )
-    radek_frame.pack(fill=tk.X, pady=4, padx=5)
+    radek_frame.pack(fill=tk.X, expand=True, pady=4, padx=5)
 
     cb_poradi = ttk.Combobox(
         radek_frame,
@@ -850,7 +860,7 @@ def navrat_na_krok_1():
 # ================= HLAVNÍ OKNO =================
 root = tk.Tk()
 root.title("Automatizace konverze tabulek")
-root.geometry("880x640")
+root.geometry("960x650")
 
 style = ttk.Style()
 style.theme_use("vista")
@@ -938,88 +948,100 @@ ttk.Button(
 # ================= STRÁNKA 2: PRACOVNÍ PLOCHA A OPERACE =================
 frame_strana2 = ttk.Frame(root, padding="15")
 
-# NASTAVENÍ PÁROVÁNÍ NAHOŘE
+# KROK 2: PÁROVÁNÍ NAHOŘE
 frame_top_config = ttk.LabelFrame(
     frame_strana2,
     text=" Krok 2: Párování řádků a určování rozsahu ",
     padding="10",
 )
-frame_top_config.pack(fill=tk.X, pady=(0, 12))
+frame_top_config.pack(fill=tk.X, pady=(0, 10))
 
 ttk.Label(frame_top_config, text="P/N u Zákazníka:").grid(
     row=0, column=0, sticky=tk.W, padx=5, pady=2
 )
-cb_klic_zakaznik = ttk.Combobox(frame_top_config, width=28, state="readonly")
+cb_klic_zakaznik = ttk.Combobox(frame_top_config, width=24, state="readonly")
 cb_klic_zakaznik.grid(row=0, column=1, padx=5, pady=2)
 
 ttk.Label(frame_top_config, text="PN v Eolix:").grid(
-    row=0, column=2, sticky=tk.W, padx=(20, 5), pady=2
+    row=0, column=2, sticky=tk.W, padx=(15, 5), pady=2
 )
-cb_klic_nas = ttk.Combobox(frame_top_config, width=28, state="readonly")
+cb_klic_nas = ttk.Combobox(frame_top_config, width=24, state="readonly")
 cb_klic_nas.grid(row=0, column=3, padx=5, pady=2)
 
 ttk.Label(frame_top_config, text="Konec dat:").grid(
-    row=1, column=0, sticky=tk.W, padx=5, pady=(8, 2)
+    row=1, column=0, sticky=tk.W, padx=5, pady=(6, 2)
 )
-cb_konec_col = ttk.Combobox(frame_top_config, width=28, state="readonly")
-cb_konec_col.grid(row=1, column=1, padx=5, pady=(8, 2))
+cb_konec_col = ttk.Combobox(frame_top_config, width=24, state="readonly")
+cb_konec_col.grid(row=1, column=1, padx=5, pady=(6, 2))
 
-# SEZNAM KROKŮ A LIŠTA PROFILŮ
-header_krok3_frame = ttk.Frame(frame_strana2)
-header_krok3_frame.pack(fill=tk.X, pady=(5, 5))
+
+# HLAVNÍ PLOCHA (KROKY VLEVO, PRAVÝ PANEL VPRAVO)
+frame_body = ttk.Frame(frame_strana2)
+frame_body.pack(fill=tk.BOTH, expand=True)
+
+# LEVÁ ČÁST: KROK 3 - SEZNAM KROKŮ
+frame_left = ttk.Frame(frame_body)
+frame_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
 ttk.Label(
-    header_krok3_frame,
+    frame_left,
     text="Krok 3: Seznam prováděných operací",
     font=("Segoe UI", 10, "bold"),
-).pack(side=tk.LEFT)
+).pack(anchor=tk.W, pady=(0, 5))
 
-# Tlačítka profily nahoře vpravo
-btn_profily_frame = ttk.Frame(header_krok3_frame)
-btn_profily_frame.pack(side=tk.RIGHT)
-
-ttk.Button(
-    btn_profily_frame, text="💾 Uložit profil", command=otevrit_popup_ulozit_profil
-).pack(side=tk.LEFT, padx=4)
-
-ttk.Button(
-    btn_profily_frame, text="📂 Načíst profil", command=otevrit_popup_nacist_profil
-).pack(side=tk.LEFT, padx=4)
-
-canvas = tk.Canvas(frame_strana2, borderwidth=0, highlightthickness=0)
+canvas = tk.Canvas(frame_left, borderwidth=0, highlightthickness=0)
 scrollbar = ttk.Scrollbar(
-    frame_strana2, orient="vertical", command=canvas.yview
+    frame_left, orient="vertical", command=canvas.yview
 )
 scrollable_frame = ttk.Frame(canvas)
 
 scrollable_frame.bind(
     "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
 )
-canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-canvas.configure(yscrollcommand=scrollbar.set)
+main_canvas_win = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+canvas.bind("<Configure>", lambda e: canvas.itemconfig(main_canvas_win, width=e.width))
 
+canvas.configure(yscrollcommand=scrollbar.set)
 pripojit_scrollovani_koleckem(canvas)
 
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
-spodek_frame = ttk.Frame(frame_strana2)
-spodek_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(12, 0))
 
-# Tlačítka dole - přehlednější uspořádání s velkými mezerami
-ttk.Button(
-    spodek_frame, text="+ Přidat další krok", command=pridat_radek_operace
-).pack(anchor=tk.W, pady=(0, 15))
+# PRAVÁ ČÁST: PRAVÝ PANEL
+frame_right = ttk.Frame(frame_body, width=200)
+frame_right.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
 
-nav_frame = ttk.Frame(spodek_frame)
-nav_frame.pack(fill=tk.X)
+# 1. SEKCE: PROFILY
+box_profily = ttk.LabelFrame(frame_right, text=" Profily ", padding="10")
+box_profily.pack(fill=tk.X, pady=(0, 15))
 
 ttk.Button(
-    nav_frame, text="⮌ Zpět na výběr souborů", command=navrat_na_krok_1
-).pack(side=tk.LEFT, ipady=5)
+    box_profily, text="💾 Uložit profil", command=otevrit_popup_ulozit_profil
+).pack(fill=tk.X, pady=3, ipady=3)
 
 ttk.Button(
-    nav_frame, text="Spustit konverzi", command=spustit_konverzi
-).pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(20, 0), ipady=5)
+    box_profily, text="📂 Načíst profil", command=otevrit_popup_nacist_profil
+).pack(fill=tk.X, pady=3, ipady=3)
+
+# 2. SEKCE: ÚPRAVA KROKŮ
+box_kroky = ttk.LabelFrame(frame_right, text=" Úprava kroků ", padding="10")
+box_kroky.pack(fill=tk.X, pady=(0, 15))
+
+ttk.Button(
+    box_kroky, text="+ Přidat další krok", command=pridat_radek_operace
+).pack(fill=tk.X, pady=3, ipady=3)
+
+# 3. SEKCE: AKCE A SPUŠTĚNÍ
+box_akce = ttk.LabelFrame(frame_right, text=" Akce ", padding="10")
+box_akce.pack(fill=tk.X, side=tk.BOTTOM)
+
+ttk.Button(
+    box_akce, text="🚀 Spustit konverzi", command=spustit_konverzi
+).pack(fill=tk.X, pady=(3, 8), ipady=6)
+
+ttk.Button(
+    box_akce, text="⮌ Zpět na výběr souborů", command=navrat_na_krok_1
+).pack(fill=tk.X, pady=3, ipady=3)
 
 root.mainloop()
