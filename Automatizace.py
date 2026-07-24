@@ -690,6 +690,74 @@ def otevrit_popup_secist_více_sloupců(data_radku):
     ttk.Button(f, text="Uložit", command=ulozit).pack(side=tk.BOTTOM, fill=tk.X, ipady=4)
 
 
+# --- POP-UP OKNO PRO PŘIPOJENÍ TEXTU (SPOJENÍ TEXTŮ) ---
+def otevrit_popup_pripojit_text(data_radku):
+    popup = tk.Toplevel(root)
+    popup.title("Připojit text ze sloupce")
+    popup.geometry("520x460")
+    popup.grab_set()
+
+    f = ttk.Frame(popup, padding=15)
+    f.pack(fill=tk.BOTH, expand=True)
+
+    pridat_box_napovedy(f, "Připojí text ze Zdrojového sloupce k Cílovému sloupci. Mezi ně vloží zadaný text a dvojtečku (např. 'Původní text' + ' [Vložený text]: ' + 'Zdrojový text').")
+
+    seznam_aliasu = list(nactene_soubory.keys())
+
+    ttk.Label(f, text="1. Vyber upravovaný soubor:", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W, pady=(0, 2))
+    cb_target_file = ttk.Combobox(f, values=seznam_aliasu, width=45, state="readonly")
+    cb_target_file.set(data_radku.get("target_file", seznam_aliasu[0]))
+    cb_target_file.pack(anchor=tk.W, pady=(0, 10))
+
+    ttk.Label(f, text="2. Cílový sloupec (základní text, do kterého se uloží výsledek):", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(0, 2))
+    cb_dst_col = ttk.Combobox(f, width=45, state="readonly")
+    cb_dst_col.pack(anchor=tk.W, pady=(0, 8))
+
+    ttk.Label(f, text="3. Vložený text / Předpona (mezi texty):", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(0, 2))
+    txt_prefix = ttk.Entry(f, width=48)
+    txt_prefix.insert(0, data_radku.get("vlozeny_text", "kategorie"))
+    txt_prefix.pack(anchor=tk.W, pady=(0, 8))
+
+    ttk.Label(f, text="4. Zdrojový sloupec (text na konec):", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(0, 2))
+    cb_src_col = ttk.Combobox(f, width=45, state="readonly")
+    cb_src_col.pack(anchor=tk.W, pady=(0, 8))
+
+    lbl_preview = ttk.Label(f, text="", font=("Segoe UI", 9, "italic"), foreground="#2e7d32", wraplength=460, justify="left")
+    lbl_preview.pack(anchor=tk.W, pady=(5, 10))
+
+    def update_preview(e=None):
+        dst = cb_dst_col.get() or "SloupecA"
+        pref = txt_prefix.get()
+        src = cb_src_col.get() or "SloupecB"
+        lbl_preview.config(text=f"💡 Výsledek: [{dst}] + \" {pref}: \" + [{src}]\nPříklad: \"Tohle je text {pref}: tohle je taky text\"")
+
+    def refresh_cols(e=None):
+        cols = nactene_soubory.get(cb_target_file.get(), {}).get("sloupce", [])
+        cb_dst_col["values"] = cols
+        cb_src_col["values"] = cols
+        if cols:
+            cb_dst_col.set(data_radku.get("klic1", cols[0]))
+            cb_src_col.set(data_radku.get("klic2", cols[1] if len(cols) > 1 else cols[0]))
+        update_preview()
+
+    cb_target_file.bind("<<ComboboxSelected>>", refresh_cols)
+    cb_dst_col.bind("<<ComboboxSelected>>", update_preview)
+    cb_src_col.bind("<<ComboboxSelected>>", update_preview)
+    txt_prefix.bind("<KeyRelease>", update_preview)
+
+    refresh_cols()
+
+    def ulozit():
+        data_radku["target_file"] = cb_target_file.get()
+        data_radku["klic1"] = cb_dst_col.get()
+        data_radku["klic2"] = cb_src_col.get()
+        data_radku["vlozeny_text"] = txt_prefix.get()
+        data_radku["btn_upravit"].config(text=f"⚙ [{cb_target_file.get()}] Spojit text [{cb_dst_col.get()}] + [{cb_src_col.get()}]")
+        popup.destroy()
+
+    ttk.Button(f, text="Uložit", command=ulozit).pack(side=tk.BOTTOM, fill=tk.X, ipady=4)
+
+
 # --- POP-UP OKNO PRO OSTATNÍ DYN. OPERACE ---
 def otevrit_popup_operace(data_radku):
     op = data_radku["operace"].get()
@@ -702,6 +770,9 @@ def otevrit_popup_operace(data_radku):
         return
     elif op == "Přesunout/kopírovat data podle DVOU klíčů":
         otevrit_popup_mapovani_2_klice(data_radku)
+        return
+    elif op == "Připojit text ze sloupce (Spojení textů)":
+        otevrit_popup_pripojit_text(data_radku)
         return
 
     popup = tk.Toplevel(root)
@@ -884,6 +955,7 @@ def otevrit_popup_ulozit_profil():
                 "klic2": radek.get("klic2", ""),
                 "vybrany_sloupec": radek.get("vybrany_sloupec", ""),
                 "hodnota_naplneni": radek.get("hodnota_naplneni", ""),
+                "vlozeny_text": radek.get("vlozeny_text", ""),
                 "pn_src": radek.get("pn_src", ""), "pn_dst": radek.get("pn_dst", ""),
                 "rec_col": radek.get("rec_col", ""), "filter_text": radek.get("filter_text", ""),
                 "sum1": radek.get("sum1", ""), "sum2": radek.get("sum2", ""),
@@ -990,7 +1062,7 @@ def otevrit_popup_nacist_profil():
             zmena_operace(radek_data["operace"], radek_data["btn_upravit"], radek_data)
 
             for key in ["src_file", "dst_file", "target_file", "klic_src", "klic_dst", "k1_src", "k1_dst", "k2_src", "k2_dst",
-                        "konec_col", "mapovani_rules", "klic1", "klic2", "vybrany_sloupec", "hodnota_naplneni",
+                        "konec_col", "mapovani_rules", "klic1", "klic2", "vybrany_sloupec", "hodnota_naplneni", "vlozeny_text",
                         "pn_src", "pn_dst", "rec_col", "filter_text", "sum1", "sum2", "cat_col", "val_col",
                         "m_cat", "m_pct", "e1_cat", "e1_pct", "e2_cat", "e2_pct", "new_col_name", "sum_cols"]:
                 if key in krok: radek_data[key] = krok[key]
@@ -1004,6 +1076,8 @@ def otevrit_popup_nacist_profil():
                 radek_data["btn_upravit"].config(text=f"⚙ [{radek_data.get('target_file')}] Sečíst ➔ [{radek_data.get('new_col_name')}]")
             elif op == "Přesunout/kopírovat data podle DVOU klíčů":
                 radek_data["btn_upravit"].config(text=f"⚙ [2 Klíče] [{radek_data.get('src_file')}] ➔ [{radek_data.get('dst_file')}]")
+            elif op == "Připojit text ze sloupce (Spojení textů)":
+                radek_data["btn_upravit"].config(text=f"⚙ [{radek_data.get('target_file')}] Spojit text [{radek_data.get('klic1')}] + [{radek_data.get('klic2')}]")
 
         messagebox.showinfo("Profil načten", f"Profil '{nazev}' byl načten!")
         win.destroy()
@@ -1093,6 +1167,7 @@ def pridat_radek_operace():
         "Podmíněné rozdělení dat (Procenta / Pololetí)",
         "Sečíst více sloupců do nového sloupce",
         "Přesunout/kopírovat data podle DVOU klíčů",
+        "Připojit text ze sloupce (Spojení textů)",
         "Sečíst duplicitní řádky",
         "Přičíst sloupec k jinému",
         "Vyčistit sloupec",
@@ -1114,7 +1189,7 @@ def pridat_radek_operace():
         "btn_upravit": btn_upravit,
         "src_file": prvni_alias, "dst_file": prvni_alias, "target_file": prvni_alias,
         "mapovani_rules": [], "klic_src": "", "klic_dst": "", "konec_col": "",
-        "klic1": "", "klic2": "", "vybrany_sloupec": "", "hodnota_naplneni": ""
+        "klic1": "", "klic2": "", "vybrany_sloupec": "", "hodnota_naplneni": "", "vlozeny_text": "kategorie"
     }
 
     zmena_operace(cb_operace, btn_upravit, data_radku)
@@ -1165,6 +1240,17 @@ def spustit_konverzi():
                     zdroj = pd.to_numeric(dfs[t_file][odkud], errors="coerce").fillna(0)
                     cil = pd.to_numeric(dfs[t_file][kam], errors="coerce").fillna(0)
                     dfs[t_file][kam] = cil + zdroj
+
+            elif op == "Připojit text ze sloupce (Spojení textů)":
+                t_file = radek.get("target_file")
+                cil_col = radek.get("klic1")
+                src_col = radek.get("klic2")
+                prefix = radek.get("vlozeny_text", "")
+
+                if t_file in dfs and cil_col in dfs[t_file].columns and src_col in dfs[t_file].columns:
+                    orig_text = dfs[t_file][cil_col].fillna("").astype(str)
+                    append_text = dfs[t_file][src_col].fillna("").astype(str)
+                    dfs[t_file][cil_col] = orig_text + " " + prefix + ": " + append_text
 
             elif op == "Sečíst více sloupců do nového sloupce":
                 t_file = radek.get("target_file")
