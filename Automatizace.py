@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import openpyxl
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
@@ -84,6 +86,59 @@ def nacist_sloupce(cesta, sheet_name, header_row):
         cesta, sheet_name=sheet_name, header=header_row, nrows=0
     )
     return list(df.columns) if df is not None else []
+
+
+# --- HELPER PRO ZACHOVÁNÍ FORMÁTOVÁNÍ PŘI ULOŽENÍ ---
+def ulozit_s_formatovanim(cesta_puvodni, cesta_vystup, df, sheet_name, header_row_0based):
+    """Zkopíruje původní soubor i s barvami/formátováním a přepíše jen hodnoty buněk."""
+    if os.path.abspath(cesta_puvodni) != os.path.abspath(cesta_vystup):
+        shutil.copyfile(cesta_puvodni, cesta_vystup)
+
+    wb = openpyxl.load_workbook(cesta_vystup)
+    if sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+    else:
+        ws = wb.active
+
+    hdr_row_excel = header_row_0based + 1  # 1-based index v Excelu
+    data_start_row = hdr_row_excel + 1
+
+    # Mapování názvu sloupců na index sloupců v Excelu
+    excel_cols = {}
+    for col_idx in range(1, ws.max_column + 1):
+        val = ws.cell(row=hdr_row_excel, column=col_idx).value
+        if val is not None:
+            excel_cols[str(val).strip()] = col_idx
+
+    # Pokud v Pandas přibyl nový sloupec, přidáme ho na konec záhlaví
+    next_free_col = ws.max_column + 1
+    for col_name in df.columns:
+        col_key = str(col_name).strip()
+        if col_key not in excel_cols:
+            ws.cell(row=hdr_row_excel, column=next_free_col, value=col_name)
+            excel_cols[col_key] = next_free_col
+            next_free_col += 1
+
+    # Zápis hodnot z DataFrame do buněk Excelu
+    for r_idx, row in df.reset_index(drop=True).iterrows():
+        excel_r = data_start_row + r_idx
+        for col_name in df.columns:
+            col_key = str(col_name).strip()
+            c_idx = excel_cols[col_key]
+            val = row[col_name]
+            if pd.isna(val):
+                val = None
+            ws.cell(row=excel_r, column=c_idx, value=val)
+
+    # Vyčištění případných přebytečných řádků dole (při sloučení duplicit)
+    max_df_row = data_start_row + len(df) - 1
+    if ws.max_row > max_df_row:
+        for r in range(max_df_row + 1, ws.max_row + 1):
+            for c_idx in excel_cols.values():
+                ws.cell(row=r, column=c_idx, value=None)
+
+    wb.save(cesta_vystup)
+    wb.close()
 
 
 # --- STRÁNKA 1: DYNAMICKÁ SPRÁVA SOUBORŮ ---
@@ -1373,32 +1428,40 @@ def spustit_konverzi():
                     else:
                         dfs[t_file][col] = val
 
-        # Uložení výsledku
+        # ULOŽENÍ VÝSLEDKU SE ZACHOVÁNÍM FORMÁTOVÁNÍ
         if len(nactene_soubory) == 1:
             alias = list(nactene_soubory.keys())[0]
+            orig_cesta = nactene_soubory[alias]["cesta"]
+
             if var_single_output.get() == "overwrite":
-                vystupni_cesta = nactene_soubory[alias]["cesta"]
+                vystupni_cesta = orig_cesta
             else:
                 vystupni_cesta = filedialog.asksaveasfilename(
                     filetypes=[("Excel (.xlsx)", "*.xlsx")],
                     defaultextension=".xlsx",
-                    initialdir=os.path.dirname(nactene_soubory[alias]["cesta"])
+                    initialdir=os.path.dirname(orig_cesta)
                 )
                 if not vystupni_cesta: return
+
             sheet_out = nactene_soubory[alias]["sheet"]
+            hdr_out = nactene_soubory[alias]["hdr"]
             df_out = dfs[alias]
+
+            ulozit_s_formatovanim(orig_cesta, vystupni_cesta, df_out, sheet_out, hdr_out)
+
         else:
             vystupni_cesta = os.path.splitext(cesta_cil_global)[0] + ".xlsx"
             alias_out = list(nactene_soubory.keys())[-1]
+            orig_cesta = nactene_soubory[alias_out]["cesta"]
             sheet_out = nactene_soubory[alias_out]["sheet"]
+            hdr_out = nactene_soubory[alias_out]["hdr"]
             df_out = dfs[alias_out]
 
-        with pd.ExcelWriter(vystupni_cesta, engine="openpyxl") as writer:
-            df_out.to_excel(writer, index=False, sheet_name=sheet_out)
+            ulozit_s_formatovanim(orig_cesta, vystupni_cesta, df_out, sheet_out, hdr_out)
 
         messagebox.showinfo(
             "Hotovo",
-            f"Zpracování proběhlo úspěšně!\nUloženo do:\n{os.path.basename(vystupni_cesta)}",
+            f"Zpracování proběhlo úspěšně!\nFormátování bylo zachováno.\nUloženo do:\n{os.path.basename(vystupni_cesta)}",
         )
         root.destroy()
 
@@ -1408,7 +1471,7 @@ def spustit_konverzi():
             "Nepodařilo se uložit výsledek!\nCílový soubor je právě otevřený v jiném programu (např. v Excelu).\nNejdříve ho prosím zavři.",
         )
     except Exception as e:
-        messagebox.showerror("Chyba při zpracování", f"Něco kleklo v Pandas:\n{str(e)}")
+        messagebox.showerror("Chyba při zpracování", f"Něco kleklo v Pandas/OpenPyXL:\n{str(e)}")
 
 
 def navrat_na_krok_1():
