@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="cs" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Automation Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- SheetJS pro práci s Excelem -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.7);
+        }
+        .dragover {
+            border-color: #6366f1 !important;
+            background-color: rgba(99, 102, 241, 0.08) !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300 antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Horní lišta -->
+    <header class="sticky top-0 z-30 backdrop-blur-md bg-white/75 dark:bg-slate-900/75 border-b border-slate-200/80 dark:border-slate-800/80 transition-colors duration-300">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 text-white font-bold text-lg">
+                    ⚡
+                </div>
+                <div>
+                    <h1 class="text-base font-bold bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-700 dark:from-white dark:via-indigo-200 dark:to-slate-300 bg-clip-text text-transparent">
+                        Excel Studio
+                    </h1>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium -mt-0.5">Automatizace a transformace tabulek</p>
+                </div>
+            </div>
+
+            <!-- Tlačítko pro Dark Mode -->
+            <button onclick="toggleDarkMode()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 hover:scale-105 active:scale-95 transition-all text-slate-600 dark:text-slate-300">
+                <span id="themeIconSun" class="hidden text-base">☀️</span>
+                <span id="themeIconMoon" class="text-base">🌙</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-6 md:py-8">
+
+        <!-- ================= STRÁNKA 1: VSTUPNÍ SOUBORY ================= -->
+        <div id="strana1" class="space-y-6 transition-all duration-300">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">1. Vstupní Excel soubory</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Přetáhni soubory myší do obdélníku nebo klikni pro výběr z počítače.</p>
+                </div>
+                <span class="text-xs font-semibold px-3 py-1 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 rounded-full">
+                    Krok 1 z 2
+                </span>
+            </div>
+
+            <!-- Seznam souborů -->
+            <div id="seznamSouboru" class="grid grid-cols-1 gap-5"></div>
+
+            <button onclick="pridatSouborUI()" class="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-50/50 dark:bg-slate-900/20 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 transition-all flex items-center justify-center gap-2 group">
+                <span class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 group-hover:bg-indigo-500 group-hover:text-white flex items-center justify-center transition-colors">+</span>
+                Přidat další soubor
+            </button>
+
+            <!-- Sekce výstupu -->
+            <div class="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm space-y-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nastavení výstupu</h3>
+                
+                <div id="vystupSingle" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Výstupní název souboru:</label>
+                    <input type="text" id="outFileNameSingle" value="Vysledek.xlsx" class="border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-xl px-3.5 py-2 text-xs w-full max-w-sm focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                </div>
+
+                <div id="vystupMulti" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Název výsledného spojeného souboru:</label>
+                    <input type="text" id="outFileNameMulti" value="Spojeny_Vysledek.xlsx" class="border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-xl px-3.5 py-2 text-xs w-full max-w-sm focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                </div>
+            </div>
+
+            <button onclick="prejitNaKrok2()" class="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white font-semibold py-4 rounded-2xl shadow-lg shadow-indigo-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+                <span>Pokračovat k nastavení pravidel</span>
+                <span class="text-lg">➔</span>
+            </button>
+        </div>
+
+        <!-- ================= STRÁNKA 2: PRACOVNÍ PLOCHA ================= -->
+        <div id="strana2" class="hidden space-y-6 transition-all duration-300">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">2. Tok automatizace</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Nastav sled operací, které se provedou nad načtenými tabulkami.</p>
+                </div>
+                <span class="text-xs font-semibold px-3 py-1 bg-purple-50 dark:bg-purple-950/60 border border-purple-200/60 dark:border-purple-800/60 text-purple-600 dark:text-purple-400 rounded-full">
+                    Krok 2 z 2
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Seznam kroků (Vlevo) -->
+                <div class="lg:col-span-2 space-y-3">
+                    <div id="seznamKroku" class="space-y-3"></div>
+                </div>
+
+                <!-- Ovládací panely (Vpravo) -->
+                <div class="space-y-4">
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-3">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">Stavební bloky</span>
+                        <button onclick="pridatRadekOperace()" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-all flex items-center justify-center gap-1.5">
+                            <span class="font-bold">+</span> Přidat další krok
+                        </button>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">Uložené profily</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="otevritUlozitProfil()" class="py-2.5 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-xs font-semibold rounded-xl transition">
+                                💾 Uložit
+                            </button>
+                            <button onclick="otevritNacistProfil()" class="py-2.5 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-xs font-semibold rounded-xl transition">
+                                📂 Načíst
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-2">
+                        <button onclick="spustitKonverzi()" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+                            <span>🚀 Spustit konverzi</span>
+                        </button>
+                        <button onclick="navratNaKrok1()" class="w-full py-2.5 text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium transition">
+                            ⮌ Zpět na výběr souborů
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ================= MODAL / POP-UP ================= -->
+    <div id="modalOverlay" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800/80 w-full max-w-xl max-h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                <div class="flex items-center gap-2">
+                    <h3 id="modalTitle" class="font-bold text-sm text-slate-900 dark:text-white">Nastavení operace</h3>
+                    <div id="modalInfoIcon" class="relative group cursor-pointer hidden">
+                        <span class="w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] flex items-center justify-center">i</span>
+                        <div id="modalTooltip" class="absolute left-6 top-0 w-80 p-3 bg-slate-900 dark:bg-slate-800 text-white rounded-xl shadow-xl text-[11px] leading-relaxed hidden group-hover:block z-50 pointer-events-none border border-slate-700"></div>
+                    </div>
+                </div>
+                <button onclick="zavritModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition">✕</button>
+            </div>
+            <div id="modalContent" class="p-6 overflow-y-auto space-y-4 text-xs"></div>
+            <div id="modalFooter" class="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end gap-2"></div>
+        </div>
+    </div>
+
+    <!-- ================= JAVASCRIPT LOGIKA ================= -->
+    <script>
+        let souboryData = [];
+        let operaceData = [];
+        const PROFILY_KEY = 'excel_studio_profiles';
+
+        const DEFINICE_OPERACI = {
+            "Kopírování sloupců podle kódu (1 klíč)": {
+                popis: "Vyhledá v cílovém souboru řádek se stejným identifikačním kódem (např. P/N) jako ve zdrojovém souboru a překopíruje vybrané sloupce.",
+                priklad: "Příklad: Najde P/N 'ABC-123' a ze sloupce 'Cena' u Zákazníka zapíše hodnotu do sloupce 'Nákupní cena' v Naší šabloně."
+            },
+            "Chytré rozdělení pololetí (IAM / OE / OES)": {
+                popis: "Sečte hodnoty ze zadaných pololetí. Pokud text příjemce obsahuje zadanou interní zkratku (např. '/MA'), zapíše 100 % do řádku IAM. V opačném případě rozdělí součet na 30 % do řádku OE a 70 % do řádku OES.",
+                priklad: "Příklad: Součet pololetí je 100 ks. Pro 'Klient/MA' zapíše 100 ks do IAM. Pro 'Běžný klient' zapíše 30 ks do OE a 70 ks do OES."
+            },
+            "Sečíst sloupce dohromady (Vytvořit součet)": {
+                popis: "Vezme vybrané číselné sloupce v jednom souboru, řádek po řádku je sečte a výsledek uloží do nově vytvořeného sloupce.",
+                priklad: "Příklad: Sečte sloupec 'Q1' (10) a 'Q2' (15) do nového sloupce 'Celkem' (25)."
+            },
+            "Kopírování sloupců podle kombinace 2 kódů": {
+                popis: "Páruje a přenáší data pouze do řádků, kde se současně shodují dva různé parametry (např. P/N kód a typ zástupce).",
+                priklad: "Příklad: Překopíruje data pouze do řádku, kde je P/N 'ABC' A ZÁROVEŇ ve sloupci Typ je 'IAM'."
+            },
+            "Sloučit texty z více sloupců": {
+                popis: "Vezme text z cílového sloupce a na jeho konec připojí volitelnou předponu a text ze zdrojového sloupce.",
+                priklad: "Příklad: Sloupec A obsahuje 'Motor', Sloupec B 'Diesel'. S předponou 'typ' vznikne 'Motor typ: Diesel'."
+            },
+            "Sloučit duplicity a sečíst množství": {
+                popis: "Najde řádky se stejnou hodnotou ve vybraném sloupci a sloučí je do jednoho. Číselné hodnoty sečte, texty ponechá.",
+                priklad: "Příklad: Máte 3 řádky s kódem 'KOLO-01' s množstvím 2, 3 a 5 ks. Výsledkem bude 1 řádek 'KOLO-01' s celkem 10 ks."
+            },
+            "Přičíst hodnotu z jednoho sloupce do druhého": {
+                popis: "Vezme čísla ze zdrojového sloupce a matematicky je přičte k hodnotám v cílovém sloupci v rámci téže tabulky.",
+                priklad: "Příklad: Ve sloupci 'Sklad' máte 5 ks a ve sloupci 'Příjem' 10 ks. Po operaci bude ve sloupci 'Sklad' 15 ks."
+            },
+            "Vymazat obsah celého sloupce": {
+                popis: "Kompletně vymaže veškeré hodnoty ve zvoleném sloupci a zanechá buňky prázdné.",
+                priklad: "Příklad: Sloupec 'Poznámka' se celý vyprázdní."
+            },
+            "Vyplnit sloupec stejnou hodnotou": {
+                popis: "Do každého řádku vybraného sloupce vepíše stejný zadaný text nebo číslo (lze omezit podle délky jiného sloupce).",
+                priklad: "Příklad: Do celého sloupce 'Stav' zapíše text 'Schváleno'."
+            }
+        };
+
+        function initTheme() {
+            const isDark = localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.classList.toggle('dark', isDark);
+            document.getElementById('themeIconSun').classList.toggle('hidden', !isDark);
+            document.getElementById('themeIconMoon').classList.toggle('hidden', isDark);
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('themeIconSun').classList.toggle('hidden', !isDark);
+            document.getElementById('themeIconMoon').classList.toggle('hidden', isDark);
+        }
+        initTheme();
+
+        function pridatSouborUI() {
+            const id = Date.now() + Math.random();
+            souboryData.push({ id, fileObj: null, alias: '', sheet: '', hdr: 1, workbook: null, columns: [], colMap: {}, rows: [] });
+            vykreslitSoubory();
+        }
+
+        function odebratSouborUI(id) {
+            souboryData = souboryData.filter(s => s.id !== id);
+            vykreslitSoubory();
+        }
+
+        function vykreslitSoubory() {
+            const container = document.getElementById('seznamSouboru');
+            container.innerHTML = '';
+
+            souboryData.forEach((s, idx) => {
+                const card = document.createElement('div');
+                card.className = 'p-6 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm transition-all hover:border-slate-300 dark:hover:border-slate-700';
+                
+                const dropzoneHtml = !s.fileObj ? `
+                    <div id="dropzone_${s.id}" 
+                         ondragover="handleDragOver(event, ${s.id})" 
+                         ondragleave="handleDragLeave(event, ${s.id})" 
+                         ondrop="handleDrop(event, ${s.id})"
+                         onclick="document.getElementById('file_input_${s.id}').click()"
+                         class="border-2 border-dashed border-slate-300 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-2xl p-6 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-950/40 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 transition-all group">
+                        <input type="file" id="file_input_${s.id}" accept=".xlsx, .xls, .xlsm, .csv" onchange="nacistExcel(event, ${s.id})" class="hidden">
+                        <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
+                            📁
+                        </div>
+                        <p class="text-xs font-bold text-slate-700 dark:text-slate-200 mb-0.5">
+                            Přetáhni Excel soubor sem nebo <span class="text-indigo-600 dark:text-indigo-400 underline">vyber z PC</span>
+                        </p>
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500">Podporuje .xlsx, .xls, .xlsm nebo .csv</p>
+                    </div>
+                ` : `
+                    <div class="p-3.5 bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/50 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
+                                ✓
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-emerald-950 dark:text-emerald-200">${s.fileObj.name}</p>
+                                <p class="text-[10px] text-emerald-600 dark:text-emerald-400">${(s.fileObj.size / 1024).toFixed(1)} KB • Načteno (${s.rows.length} řádků)</p>
+                            </div>
+                        </div>
+                        <input type="file" id="file_input_${s.id}" accept=".xlsx, .xls, .xlsm, .csv" onchange="nacistExcel(event, ${s.id})" class="hidden">
+                        <button onclick="document.getElementById('file_input_${s.id}').click()" class="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 underline">
+                            Změnit soubor
+                        </button>
+                    </div>
+                `;
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center">
+                                ${idx + 1}
+                            </span>
+                            <span class="font-bold text-xs text-slate-800 dark:text-slate-200">${s.alias || 'Nový soubor'}</span>
+                        </div>
+                        ${souboryData.length > 1 ? `<button onclick="odebratSouborUI(${s.id})" class="text-xs font-semibold text-rose-500 hover:text-rose-600 transition">✕ Odebrat</button>` : ''}
+                    </div>
+
+                    <div class="space-y-4">
+                        ${dropzoneHtml}
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Název / Alias pro pravidla:</label>
+                                <input type="text" value="${s.alias}" onchange="aktualizovatAlias(${s.id}, this.value)" placeholder="Např. Zákazník" 
+                                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Aktivní List v sešitu:</label>
+                                <select onchange="zmenaListu(${s.id}, this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                                    ${s.workbook ? s.workbook.SheetNames.map(sh => `<option value="${sh}" ${sh === s.sheet ? 'selected' : ''}>${sh}</option>`).join('') : '<option value="">-- Není vybrán soubor --</option>'}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Číslo řádku se záhlavím:</label>
+                                <input type="number" min="1" value="${s.hdr}" onchange="zmenaZahlavi(${s.id}, this.value)" 
+                                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            const isSingle = souboryData.length <= 1;
+            document.getElementById('vystupSingle').classList.toggle('hidden', !isSingle);
+            document.getElementById('vystupMulti').classList.toggle('hidden', isSingle);
+        }
+
+        function handleDragOver(e, id) {
+            e.preventDefault();
+            const el = document.getElementById(`dropzone_${id}`);
+            if (el) el.classList.add('dragover');
+        }
+
+        function handleDragLeave(e, id) {
+            e.preventDefault();
+            const el = document.getElementById(`dropzone_${id}`);
+            if (el) el.classList.remove('dragover');
+        }
+
+        function handleDrop(e, id) {
+            e.preventDefault();
+            const el = document.getElementById(`dropzone_${id}`);
+            if (el) el.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) zpracovatNovySoubor(files[0], id);
+        }
+
+        function nacistExcel(e, id) {
+            const file = e.target.files[0];
+            if (file) zpracovatNovySoubor(file, id);
+        }
+
+        function zpracovatNovySoubor(file, id) {
+            const s = souboryData.find(x => x.id === id);
+            s.fileObj = file;
+            s.alias = file.name.replace(/\.[^/.]+$/, "");
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                s.workbook = XLSX.read(data, { type: 'array', cellStyles: true, cellNF: true, cellDates: true });
+                s.sheet = s.workbook.SheetNames[0];
+                zpracovatDataSouboru(s);
+                vykreslitSoubory();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function zmenaListu(id, val) {
+            const s = souboryData.find(x => x.id === id);
+            s.sheet = val;
+            zpracovatDataSouboru(s);
+            vykreslitSoubory();
+        }
+
+        function zmenaZahlavi(id, val) {
+            const s = souboryData.find(x => x.id === id);
+            s.hdr = parseInt(val) || 1;
+            zpracovatDataSouboru(s);
+            vykreslitSoubory();
+        }
+
+        function aktualizovatAlias(id, val) {
+            const s = souboryData.find(x => x.id === id);
+            s.alias = val.trim();
+        }
+
+        function zpracovatDataSouboru(s) {
+            if (!s.workbook || !s.sheet) return;
+            const ws = s.workbook.Sheets[s.sheet];
+            if (!ws || !ws['!ref']) return;
+
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const hdr_r = (s.hdr || 1) - 1;
+
+            s.columns = [];
+            s.colMap = {};
+
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cell = ws[XLSX.utils.encode_cell({ r: hdr_r, c: C })];
+                if (cell && cell.v !== undefined && cell.v !== null) {
+                    const colName = String(cell.v).trim();
+                    if (colName) {
+                        s.columns.push(colName);
+                        s.colMap[colName] = C;
+                    }
+                }
+            }
+
+            s.rows = [];
+            for (let R = hdr_r + 1; R <= range.e.r; ++R) {
+                let rowObj = { _excel_row: R };
+                let hasData = false;
+                for (let colName of s.columns) {
+                    const C = s.colMap[colName];
+                    const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+                    const val = cell ? cell.v : "";
+                    rowObj[colName] = (val !== undefined && val !== null) ? val : "";
+                    if (val !== "" && val !== undefined && val !== null) hasData = true;
+                }
+                if (hasData) {
+                    s.rows.push(rowObj);
+                }
+            }
+        }
+
+        function prejitNaKrok2() {
+            for (let s of souboryData) {
+                if (!s.fileObj || !s.workbook) {
+                    alert(`Soubor '${s.alias || 'bez názvu'}' ještě není vybraný!`);
+                    return;
+                }
+            }
+            document.getElementById('strana1').classList.add('hidden');
+            document.getElementById('strana2').classList.remove('hidden');
+
+            if (operaceData.length === 0) {
+                pridatRadekOperace();
+            }
+        }
+
+        function navratNaKrok1() {
+            document.getElementById('strana2').classList.add('hidden');
+            document.getElementById('strana1').classList.remove('hidden');
+        }
+
+        function pridatRadekOperace() {
+            const id = Date.now() + Math.random();
+            const prvniAlias = souboryData[0]?.alias || '';
+            const druhyAlias = souboryData[1]?.alias || prvniAlias;
+
+            operaceData.push({
+                id,
+                poradi: operaceData.length + 1,
+                operace: Object.keys(DEFINICE_OPERACI)[0],
+                src_file: prvniAlias, dst_file: druhyAlias, target_file: prvniAlias,
+                klic_src: '', klic_dst: '', konec_col: '', mapovani_rules: [],
+                k1_src: '', k1_dst: '', k2_src: '', k2_dst: '',
+                klic1: '', klic2: '', vybrany_sloupec: '', hodnota_naplneni: '',
+                vlozeny_text: 'kategorie', filter_text: '/MA',
+                m_cat: 'IAM', m_pct: 100, e1_cat: 'OE', e1_pct: 30, e2_cat: 'OES', e2_pct: 70
+            });
+            vykreslitKroky();
+        }
+
+        function smazatRadekOperace(id) {
+            operaceData = operaceData.filter(o => o.id !== id);
+            operaceData.forEach((o, i) => o.poradi = i + 1);
+            vykreslitKroky();
+        }
+
+        function zmenaPoradi(id, novePoradi) {
+            const index = operaceData.findIndex(o => o.id === id);
+            const item = operaceData.splice(index, 1)[0];
+            operaceData.splice(novePoradi - 1, 0, item);
+            operaceData.forEach((o, i) => o.poradi = i + 1);
+            vykreslitKroky();
+        }
+
+        function vykreslitKroky() {
+            const container = document.getElementById('seznamKroku');
+            container.innerHTML = '';
+
+            operaceData.forEach((o) => {
+                const info = DEFINICE_OPERACI[o.operace] || { popis: '', priklad: '' };
+                const card = document.createElement('div');
+                card.className = 'p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm flex items-center gap-3 transition hover:border-slate-300 dark:hover:border-slate-700';
+                
+                card.innerHTML = `
+                    <select onchange="zmenaPoradi(${o.id}, this.value)" class="border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-xs rounded-xl px-2.5 py-2 outline-none">
+                        ${operaceData.map((_, i) => `<option value="${i + 1}" ${i + 1 === o.poradi ? 'selected' : ''}>${i + 1}</option>`).join('')}
+                    </select>
+
+                    <div class="flex-1 flex items-center gap-2">
+                        <select onchange="zmenaTypuOperace(${o.id}, this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-semibold rounded-xl px-3 py-2 outline-none">
+                            ${Object.keys(DEFINICE_OPERACI).map(op => `<option value="${op}" ${op === o.operace ? 'selected' : ''}>${op}</option>`).join('')}
+                        </select>
+                        
+                        <div class="relative group cursor-pointer">
+                            <span class="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-950 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-[11px] flex items-center justify-center transition">
+                                i
+                            </span>
+                            <div class="absolute left-7 top-1/2 -translate-y-1/2 w-80 p-3.5 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-2xl text-[11px] leading-relaxed hidden group-hover:block z-50 pointer-events-none border border-slate-700">
+                                <p class="font-bold text-indigo-300 mb-1">Popis funkce:</p>
+                                <p class="text-slate-300 mb-2">${info.popis}</p>
+                                <p class="text-emerald-400 font-medium">${info.priklad}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="otevritNastaveniOperace(${o.id})" class="px-4 py-2 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 rounded-xl text-xs font-semibold transition whitespace-nowrap">
+                        ⚙ Nastavit
+                    </button>
+
+                    <button onclick="smazatRadekOperace(${o.id})" class="w-8 h-8 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center font-bold text-xs transition">
+                        ✕
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function zmenaTypuOperace(id, val) {
+            const o = operaceData.find(x => x.id === id);
+            o.operace = val;
+            vykreslitKroky();
+        }
+
+        function otevritModal(titul, htmlContent, footerHtml, infoKey) {
+            document.getElementById('modalTitle').innerText = titul;
+            document.getElementById('modalContent').innerHTML = htmlContent;
+            document.getElementById('modalFooter').innerHTML = footerHtml;
+
+            const infoIcon = document.getElementById('modalInfoIcon');
+            const tooltipEl = document.getElementById('modalTooltip');
+
+            if (infoKey && DEFINICE_OPERACI[infoKey]) {
+                const info = DEFINICE_OPERACI[infoKey];
+                tooltipEl.innerHTML = `
+                    <p class="font-bold text-indigo-300 mb-1">Popis funkce:</p>
+                    <p class="text-slate-300 mb-2">${info.popis}</p>
+                    <p class="text-emerald-400 font-medium">${info.priklad}</p>
+                `;
+                infoIcon.classList.remove('hidden');
+            } else {
+                infoIcon.classList.add('hidden');
+            }
+            document.getElementById('modalOverlay').classList.remove('hidden');
+        }
+
+        function zavritModal() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+        }
+
+        function ziskatSloupceSouboru(alias) {
+            const s = souboryData.find(x => x.alias === alias);
+            return s ? s.columns : [];
+        }
+
+        function modalZmenaTargetu(targetAlias) {
+            const cols = ziskatSloupceSouboru(targetAlias);
+            const optHtml = cols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const c1 = document.getElementById('gen_col1');
+            const c2 = document.getElementById('gen_col2');
+            if (c1) c1.innerHTML = optHtml;
+            if (c2) c2.innerHTML = optHtml;
+        }
+
+        function modalZmenaSrc(srcAlias) {
+            const srcCols = ziskatSloupceSouboru(srcAlias);
+            const ksrc = document.getElementById('modal_ksrc') || document.getElementById('p_pn_src') || document.getElementById('k2_k1_src');
+            if (ksrc) ksrc.innerHTML = srcCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const k2_src = document.getElementById('k2_k2_src');
+            if (k2_src) k2_src.innerHTML = srcCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const rec = document.getElementById('p_rec');
+            if (rec) rec.innerHTML = srcCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const sum1 = document.getElementById('p_sum1');
+            if (sum1) sum1.innerHTML = srcCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const sum2 = document.getElementById('p_sum2');
+            if (sum2) sum2.innerHTML = `<option value="">-- Žádný --</option>` + srcCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            if (window.currentMapRules) {
+                const dstAlias = document.getElementById('modal_dst')?.value || document.getElementById('k2_dst_file')?.value;
+                const dstCols = ziskatSloupceSouboru(dstAlias);
+                vykreslitMapovaniDvojice(srcCols, dstCols);
+            }
+        }
+
+        function modalZmenaDst(dstAlias) {
+            const dstCols = ziskatSloupceSouboru(dstAlias);
+            const kdst = document.getElementById('modal_kdst') || document.getElementById('p_pn_dst') || document.getElementById('k2_k1_dst');
+            if (kdst) kdst.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const k2_dst = document.getElementById('k2_k2_dst');
+            if (k2_dst) k2_dst.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const cat = document.getElementById('p_cat');
+            if (cat) cat.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const val = document.getElementById('p_val');
+            if (val) val.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            if (window.currentMapRules) {
+                const srcAlias = document.getElementById('modal_src')?.value || document.getElementById('k2_src_file')?.value;
+                const srcCols = ziskatSloupceSouboru(srcAlias);
+                vykreslitMapovaniDvojice(srcCols, dstCols);
+            }
+        }
+
+        function otevritNastaveniOperace(id) {
+            const o = operaceData.find(x => x.id === id);
+            const aliasy = souboryData.map(s => s.alias);
+
+            if (o.operace === 'Kopírování sloupců podle kódu (1 klíč)') {
+                const srcCols = ziskatSloupceSouboru(o.src_file);
+                const dstCols = ziskatSloupceSouboru(o.dst_file);
+
+                const html = `
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="font-semibold block mb-1">Zdrojový soubor:</label>
+                            <select id="modal_src" onchange="modalZmenaSrc(this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">
+                                ${aliasy.map(a => `<option value="${a}" ${a === o.src_file ? 'selected' : ''}>${a}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Cílový soubor:</label>
+                            <select id="modal_dst" onchange="modalZmenaDst(this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">
+                                ${aliasy.map(a => `<option value="${a}" ${a === o.dst_file ? 'selected' : ''}>${a}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Párovací kód ve Zdroji:</label>
+                            <select id="modal_ksrc" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">
+                                ${srcCols.map(c => `<option value="${c}" ${c === o.klic_src ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Párovací kód v Cíli:</label>
+                            <select id="modal_kdst" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">
+                                ${dstCols.map(c => `<option value="${c}" ${c === o.klic_dst ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-100 dark:border-slate-800 pt-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-[11px] text-slate-500">Přenášené dvojice sloupců:</span>
+                            <button onclick="pridatDvojiciMapovani()" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 font-semibold rounded-lg text-[11px]">+ Přidat dvojici</button>
+                        </div>
+                        <div id="mapovaniContainer" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+                    </div>
+                `;
+
+                const footer = `<button onclick="ulozitMapovani1(${o.id})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs">Uložit nastavení</button>`;
+                otevritModal(o.operace, html, footer, o.operace);
+
+                window.currentMapRules = o.mapovani_rules.length ? [...o.mapovani_rules] : [{ src: srcCols[0] || '', dst: dstCols[0] || '' }];
+                vykreslitMapovaniDvojice(srcCols, dstCols);
+
+            } else if (o.operace === 'Chytré rozdělení pololetí (IAM / OE / OES)') {
+                const srcCols = ziskatSloupceSouboru(o.src_file);
+                const dstCols = ziskatSloupceSouboru(o.dst_file);
+
+                const html = `
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="font-semibold block mb-1">Zdrojový soubor:</label>
+                            <select id="p_src" onchange="modalZmenaSrc(this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${aliasy.map(a => `<option value="${a}" ${a === o.src_file ? 'selected' : ''}>${a}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Cílový soubor:</label>
+                            <select id="p_dst" onchange="modalZmenaDst(this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${aliasy.map(a => `<option value="${a}" ${a === o.dst_file ? 'selected' : ''}>${a}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">P/N Kód Zdroj:</label>
+                            <select id="p_pn_src" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${srcCols.map(c => `<option value="${c}" ${c === o.pn_src ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">P/N Kód Cíl:</label>
+                            <select id="p_pn_dst" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${dstCols.map(c => `<option value="${c}" ${c === o.pn_dst ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-100 dark:border-slate-800 pt-2 grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="font-semibold block mb-1">Sloupec s příjemcem:</label>
+                            <select id="p_rec" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${srcCols.map(c => `<option value="${c}" ${c === o.rec_col ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Přesný text (interní zkratka):</label>
+                            <input type="text" id="p_filter" value="${o.filter_text}" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">1. Pololetí (sloupec):</label>
+                            <select id="p_sum1" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${srcCols.map(c => `<option value="${c}" ${c === o.sum1 ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">2. Pololetí (sloupec):</label>
+                            <select id="p_sum2" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl"><option value="">-- Žádný --</option>${srcCols.map(c => `<option value="${c}" ${c === o.sum2 ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-100 dark:border-slate-800 pt-2 grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="font-semibold block mb-1">Cílový sloupec kategorie (např. S):</label>
+                            <select id="p_cat" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${dstCols.map(c => `<option value="${c}" ${c === o.cat_col ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Cílový hodnotový sloupec (např. 2026):</label>
+                            <select id="p_val" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${dstCols.map(c => `<option value="${c}" ${c === o.val_col ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                    </div>
+                `;
+                const footer = `<button onclick="ulozitPodminene(${o.id})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs">Uložit pravidla</button>`;
+                otevritModal(o.operace, html, footer, o.operace);
+
+            } else if (o.operace === 'Kopírování sloupců podle kombinace 2 kódů') {
+                const srcCols = ziskatSloupceSouboru(o.src_file);
+                const dstCols = ziskatSloupceSouboru(o.dst_file);
+
+                const html = `
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="font-semibold block mb-1">Zdrojový soubor:</label>
+                            <select id="k2_src_file" onchange="modalZmenaSrc(this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${aliasy.map(a => `<option value="${a}" ${a === o.src_file ? 'selected' : ''}>${a}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Cílový soubor:</label>
+                            <select id="k2_dst_file" onchange="modalZmenaDst(this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${aliasy.map(a => `<option value="${a}" ${a === o.dst_file ? 'selected' : ''}>${a}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Klíč 1 (Zdroj):</label>
+                            <select id="k2_k1_src" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${srcCols.map(c => `<option value="${c}" ${c === o.k1_src ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Klíč 1 (Cíl):</label>
+                            <select id="k2_k1_dst" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${dstCols.map(c => `<option value="${c}" ${c === o.k1_dst ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Klíč 2 (Zdroj):</label>
+                            <select id="k2_k2_src" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${srcCols.map(c => `<option value="${c}" ${c === o.k2_src ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                        <div>
+                            <label class="font-semibold block mb-1">Klíč 2 (Cíl):</label>
+                            <select id="k2_k2_dst" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${dstCols.map(c => `<option value="${c}" ${c === o.k2_dst ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-100 dark:border-slate-800 pt-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-[11px] text-slate-500">Přenášené dvojice sloupců:</span>
+                            <button onclick="pridatDvojiciMapovani()" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 font-semibold rounded-lg text-[11px]">+ Přidat dvojici</button>
+                        </div>
+                        <div id="mapovaniContainer" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+                    </div>
+                `;
+
+                const footer = `<button onclick="ulozitMapovani2(${o.id})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs">Uložit nastavení</button>`;
+                otevritModal(o.operace, html, footer, o.operace);
+
+                window.currentMapRules = o.mapovani_rules.length ? [...o.mapovani_rules] : [{ src: srcCols[0] || '', dst: dstCols[0] || '' }];
+                vykreslitMapovaniDvojice(srcCols, dstCols);
+
+            } else {
+                const tCols = ziskatSloupceSouboru(o.target_file);
+                let specificHtml = '';
+
+                if (o.operace === 'Vymazat obsah celého sloupce') {
+                    specificHtml = `
+                        <label class="font-semibold block mb-1">Vyber sloupec k vymazání:</label>
+                        <select id="gen_col1" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${tCols.map(c => `<option value="${c}" ${c === o.vybrany_sloupec ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                    `;
+                } else if (o.operace === 'Vyplnit sloupec stejnou hodnotou') {
+                    specificHtml = `
+                        <label class="font-semibold block mb-1">Vyber sloupec k naplnění:</label>
+                        <select id="gen_col1" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl mb-3">${tCols.map(c => `<option value="${c}" ${c === o.vybrany_sloupec ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        <label class="font-semibold block mb-1">Zadávaná hodnota / Text:</label>
+                        <input type="text" id="gen_val" value="${o.hodnota_naplneni}" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">
+                    `;
+                } else if (o.operace === 'Přičíst hodnotu z jednoho sloupce do druhého') {
+                    specificHtml = `
+                        <label class="font-semibold block mb-1">Zdrojový sloupec:</label>
+                        <select id="gen_col1" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl mb-3">${tCols.map(c => `<option value="${c}" ${c === o.klic1 ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        <label class="font-semibold block mb-1">Cílový sloupec (kam se přičte):</label>
+                        <select id="gen_col2" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${tCols.map(c => `<option value="${c}" ${c === o.klic2 ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                    `;
+                } else if (o.operace === 'Sloučit texty z více sloupců') {
+                    specificHtml = `
+                        <label class="font-semibold block mb-1">Základní cílový sloupec:</label>
+                        <select id="gen_col1" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl mb-2">${tCols.map(c => `<option value="${c}" ${c === o.klic1 ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        <label class="font-semibold block mb-1">Vložená předpona / Text:</label>
+                        <input type="text" id="gen_val" value="${o.vlozeny_text}" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl mb-2">
+                        <label class="font-semibold block mb-1">Druhý sloupec na konec:</label>
+                        <select id="gen_col2" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${tCols.map(c => `<option value="${c}" ${c === o.klic2 ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                    `;
+                } else if (o.operace === 'Sloučit duplicity a sečíst množství') {
+                    specificHtml = `
+                        <label class="font-semibold block mb-1">Sloučit duplicitní řádky podle sloupce:</label>
+                        <select id="gen_col1" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${tCols.map(c => `<option value="${c}" ${c === o.klic1 ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                    `;
+                }
+
+                const html = `
+                    <div class="mb-3">
+                        <label class="font-semibold block mb-1">Vyber upravovaný soubor:</label>
+                        <select id="gen_target" onchange="modalZmenaTargetu(this.value)" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl">${aliasy.map(a => `<option value="${a}" ${a === o.target_file ? 'selected' : ''}>${a}</option>`).join('')}</select>
+                    </div>
+                    ${specificHtml}
+                `;
+                const footer = `<button onclick="ulozitObecne(${o.id})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs">Uložit</button>`;
+                otevritModal(o.operace, html, footer, o.operace);
+            }
+        }
+
+        function vykreslitMapovaniDvojice(srcCols, dstCols) {
+            const container = document.getElementById('mapovaniContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            window.currentMapRules.forEach((r, idx) => {
+                const div = document.createElement('div');
+                div.className = 'flex gap-2 items-center text-xs';
+                div.innerHTML = `
+                    <select onchange="window.currentMapRules[${idx}].src = this.value" class="border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl flex-1">
+                        ${srcCols.map(c => `<option value="${c}" ${c === r.src ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                    <span class="text-slate-400">➔</span>
+                    <select onchange="window.currentMapRules[${idx}].dst = this.value" class="border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl flex-1">
+                        ${dstCols.map(c => `<option value="${c}" ${c === r.dst ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                    <button onclick="smazatDvojiciMapovani(${idx})" class="text-slate-400 hover:text-rose-500 font-bold px-1.5">✕</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function pridatDvojiciMapovani() {
+            const srcCols = ziskatSloupceSouboru(document.getElementById('modal_src')?.value || document.getElementById('k2_src_file')?.value);
+            const dstCols = ziskatSloupceSouboru(document.getElementById('modal_dst')?.value || document.getElementById('k2_dst_file')?.value);
+            window.currentMapRules.push({ src: srcCols[0] || '', dst: dstCols[0] || '' });
+            vykreslitMapovaniDvojice(srcCols, dstCols);
+        }
+
+        function smazatDvojiciMapovani(idx) {
+            window.currentMapRules.splice(idx, 1);
+            const srcCols = ziskatSloupceSouboru(document.getElementById('modal_src')?.value || document.getElementById('k2_src_file')?.value);
+            const dstCols = ziskatSloupceSouboru(document.getElementById('modal_dst')?.value || document.getElementById('k2_dst_file')?.value);
+            vykreslitMapovaniDvojice(srcCols, dstCols);
+        }
+
+        function ulozitMapovani1(id) {
+            const o = operaceData.find(x => x.id === id);
+            o.src_file = document.getElementById('modal_src').value;
+            o.dst_file = document.getElementById('modal_dst').value;
+            o.klic_src = document.getElementById('modal_ksrc').value;
+            o.klic_dst = document.getElementById('modal_kdst').value;
+            o.mapovani_rules = window.currentMapRules;
+            zavritModal();
+        }
+
+        function ulozitMapovani2(id) {
+            const o = operaceData.find(x => x.id === id);
+            o.src_file = document.getElementById('k2_src_file').value;
+            o.dst_file = document.getElementById('k2_dst_file').value;
+            o.k1_src = document.getElementById('k2_k1_src').value;
+            o.k1_dst = document.getElementById('k2_k1_dst').value;
+            o.k2_src = document.getElementById('k2_k2_src').value;
+            o.k2_dst = document.getElementById('k2_k2_dst').value;
+            o.mapovani_rules = window.currentMapRules;
+            zavritModal();
+        }
+
+        function ulozitPodminene(id) {
+            const o = operaceData.find(x => x.id === id);
+            o.src_file = document.getElementById('p_src').value;
+            o.dst_file = document.getElementById('p_dst').value;
+            o.pn_src = document.getElementById('p_pn_src').value;
+            o.pn_dst = document.getElementById('p_pn_dst').value;
+            o.rec_col = document.getElementById('p_rec').value;
+            o.filter_text = document.getElementById('p_filter').value;
+            o.sum1 = document.getElementById('p_sum1').value;
+            o.sum2 = document.getElementById('p_sum2').value;
+            o.cat_col = document.getElementById('p_cat').value;
+            o.val_col = document.getElementById('p_val').value;
+            zavritModal();
+        }
+
+        function ulozitObecne(id) {
+            const o = operaceData.find(x => x.id === id);
+            o.target_file = document.getElementById('gen_target').value;
+            if (document.getElementById('gen_col1')) o.vybrany_sloupec = document.getElementById('gen_col1').value;
+            if (document.getElementById('gen_col1')) o.klic1 = document.getElementById('gen_col1').value;
+            if (document.getElementById('gen_col2')) o.klic2 = document.getElementById('gen_col2').value;
+            if (document.getElementById('gen_val')) {
+                o.hodnota_naplneni = document.getElementById('gen_val').value;
+                o.vlozeny_text = document.getElementById('gen_val').value;
+            }
+            zavritModal();
+        }
+
+        function setCellValue(ws, r, c, val) {
+            const cellAddress = XLSX.utils.encode_cell({ r: r, c: c });
+            if (!ws[cellAddress]) {
+                ws[cellAddress] = { t: 's', v: '' };
+            }
+            const cell = ws[cellAddress];
+            if (val === null || val === undefined || val === '') {
+                cell.v = '';
+                cell.t = 's';
+            } else if (typeof val === 'number') {
+                cell.v = val;
+                cell.t = 'n';
+            } else if (typeof val === 'boolean') {
+                cell.v = val;
+                cell.t = 'b';
+            } else {
+                cell.v = String(val);
+                cell.t = 's';
+            }
+        }
+
+        // --- MOTOR AUTOMATIZACE ---
+        function spustitKonverzi() {
+            try {
+                const dfs = {};
+                souboryData.forEach(s => {
+                    dfs[s.alias] = JSON.parse(JSON.stringify(s.rows));
+                });
+
+                operaceData.forEach(o => {
+                    if (o.operace === 'Sloučit duplicity a sečíst množství') {
+                        const target = dfs[o.target_file];
+                        const key = o.klic1;
+                        if (!target || !key) return;
+
+                        const grouped = {};
+                        target.forEach(r => {
+                            const kVal = String(r[key]).trim();
+                            if (!grouped[kVal]) {
+                                grouped[kVal] = { ...r };
+                            } else {
+                                Object.keys(r).forEach(col => {
+                                    if (col !== key && col !== '_excel_row') {
+                                        const num = parseFloat(r[col]);
+                                        if (!isNaN(num)) {
+                                            grouped[kVal][col] = (parseFloat(grouped[kVal][col]) || 0) + num;
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                        dfs[o.target_file] = Object.values(grouped);
+
+                    } else if (o.operace === 'Přičíst hodnotu z jednoho sloupce do druhého') {
+                        const target = dfs[o.target_file];
+                        if (!target) return;
+                        target.forEach(r => {
+                            const sVal = parseFloat(r[o.klic1]) || 0;
+                            const dVal = parseFloat(r[o.klic2]) || 0;
+                            r[o.klic2] = dVal + sVal;
+                        });
+
+                    } else if (o.operace === 'Sloučit texty z více sloupců') {
+                        const target = dfs[o.target_file];
+                        if (!target) return;
+                        target.forEach(r => {
+                            const orig = String(r[o.klic1] || '');
+                            const add = String(r[o.klic2] || '');
+                            r[o.klic1] = `${orig} ${o.vlozeny_text}: ${add}`;
+                        });
+
+                    } else if (o.operace === 'Kopírování sloupců podle kódu (1 klíč)') {
+                        const srcRows = dfs[o.src_file];
+                        const dstRows = dfs[o.dst_file];
+                        if (!srcRows || !dstRows || !o.klic_src || !o.klic_dst) return;
+
+                        const mapa = {};
+                        srcRows.forEach(sr => {
+                            const k = String(sr[o.klic_src] !== undefined ? sr[o.klic_src] : '').trim().toLowerCase();
+                            if (k && k !== 'nan') mapa[k] = sr;
+                        });
+
+                        dstRows.forEach(dr => {
+                            const k = String(dr[o.klic_dst] !== undefined ? dr[o.klic_dst] : '').trim().toLowerCase();
+                            if (mapa[k]) {
+                                o.mapovani_rules.forEach(rule => {
+                                    if (rule.src && rule.dst && mapa[k][rule.src] !== undefined) {
+                                        dr[rule.dst] = mapa[k][rule.src];
+                                    }
+                                });
+                            }
+                        });
+
+                    } else if (o.operace === 'Kopírování sloupců podle kombinace 2 kódů') {
+                        const srcRows = dfs[o.src_file];
+                        const dstRows = dfs[o.dst_file];
+                        if (!srcRows || !dstRows || !o.k1_src || !o.k1_dst || !o.k2_src || !o.k2_dst) return;
+
+                        const mapa = {};
+                        srcRows.forEach(sr => {
+                            const k1 = String(sr[o.k1_src] !== undefined ? sr[o.k1_src] : '').trim().toLowerCase();
+                            const k2 = String(sr[o.k2_src] !== undefined ? sr[o.k2_src] : '').trim().toLowerCase();
+                            if (k1 && k2) mapa[`${k1}|||${k2}`] = sr;
+                        });
+
+                        dstRows.forEach(dr => {
+                            const k1 = String(dr[o.k1_dst] !== undefined ? dr[o.k1_dst] : '').trim().toLowerCase();
+                            const k2 = String(dr[o.k2_dst] !== undefined ? dr[o.k2_dst] : '').trim().toLowerCase();
+                            const composite = `${k1}|||${k2}`;
+                            if (mapa[composite]) {
+                                o.mapovani_rules.forEach(rule => {
+                                    if (rule.src && rule.dst && mapa[composite][rule.src] !== undefined) {
+                                        dr[rule.dst] = mapa[composite][rule.src];
+                                    }
+                                });
+                            }
+                        });
+
+                    } else if (o.operace === 'Chytré rozdělení pololetí (IAM / OE / OES)') {
+                        const srcRows = dfs[o.src_file];
+                        const dstRows = dfs[o.dst_file];
+                        if (!srcRows || !dstRows || !o.pn_src || !o.pn_dst || !o.cat_col || !o.val_col) return;
+
+                        const f_text = String(o.filter_text || '').trim();
+                        const m_cat = String(o.m_cat || 'IAM').trim().toUpperCase();
+                        const m_pct = (parseFloat(o.m_pct) || 100) / 100.0;
+                        const e1_cat = String(o.e1_cat || 'OE').trim().toUpperCase();
+                        const e1_pct = (parseFloat(o.e1_pct) || 30) / 100.0;
+                        const e2_cat = String(o.e2_cat || 'OES').trim().toUpperCase();
+                        const e2_pct = (parseFloat(o.e2_pct) || 70) / 100.0;
+
+                        srcRows.forEach(sr => {
+                            const pn_raw = sr[o.pn_src];
+                            if (pn_raw === undefined || pn_raw === null || pn_raw === '') return;
+                            const pn = String(pn_raw).trim().toLowerCase();
+                            if (!pn || pn === 'nan') return;
+
+                            const recVal = String(sr[o.rec_col] !== undefined ? sr[o.rec_col] : '').trim();
+                            let sumVal = 0;
+                            if (o.sum1 && sr[o.sum1] !== undefined) sumVal += parseFloat(sr[o.sum1]) || 0;
+                            if (o.sum2 && o.sum2 !== '-- Žádný --' && sr[o.sum2] !== undefined) sumVal += parseFloat(sr[o.sum2]) || 0;
+
+                            const isMatch = f_text && recVal.includes(f_text);
+
+                            dstRows.forEach(dr => {
+                                const dstPn_raw = dr[o.pn_dst];
+                                const dstPn = String(dstPn_raw !== undefined ? dstPn_raw : '').trim().toLowerCase();
+                                const dstCat = String(dr[o.cat_col] !== undefined ? dr[o.cat_col] : '').trim().toUpperCase();
+
+                                if (dstPn === pn) {
+                                    const currVal = parseFloat(dr[o.val_col]) || 0;
+                                    if (isMatch) {
+                                        if (dstCat === m_cat) {
+                                            dr[o.val_col] = currVal + (sumVal * m_pct);
+                                        }
+                                    } else {
+                                        if (dstCat === e1_cat) {
+                                            dr[o.val_col] = currVal + (sumVal * e1_pct);
+                                        } else if (dstCat === e2_cat) {
+                                            dr[o.val_col] = currVal + (sumVal * e2_pct);
+                                        }
+                                    }
+                                }
+                            });
+                        });
+
+                    } else if (o.operace === 'Vymazat obsah celého sloupce') {
+                        const target = dfs[o.target_file];
+                        if (target) target.forEach(r => r[o.vybrany_sloupec] = "");
+
+                    } else if (o.operace === 'Vyplnit sloupec stejnou hodnotou') {
+                        const target = dfs[o.target_file];
+                        if (target) target.forEach(r => r[o.vybrany_sloupec] = o.hodnota_naplneni);
+                    }
+                });
+
+                let finalAlias = souboryData.length > 1 ? souboryData[souboryData.length - 1].alias : souboryData[0].alias;
+                let targetSoubor = souboryData.find(s => s.alias === finalAlias);
+
+                const wb = targetSoubor.workbook;
+                const ws = wb.Sheets[targetSoubor.sheet];
+                const finalRows = dfs[finalAlias];
+
+                finalRows.forEach(dr => {
+                    const rowIdx = dr._excel_row;
+                    if (rowIdx !== undefined) {
+                        targetSoubor.columns.forEach(colName => {
+                            if (dr[colName] !== undefined) {
+                                const colIdx = targetSoubor.colMap[colName];
+                                setCellValue(ws, rowIdx, colIdx, dr[colName]);
+                            }
+                        });
+                    }
+                });
+
+                const outName = souboryData.length > 1 ? document.getElementById('outFileNameMulti').value : document.getElementById('outFileNameSingle').value;
+                XLSX.writeFile(wb, outName);
+
+                alert('✅ Úspěšně zpracováno a staženo s původním formátováním!');
+            } catch (err) {
+                alert('Chyba při zpracování: ' + err.message);
+            }
+        }
+
+        // --- PROFILY: UKLÁDÁNÍ, POPISY A OČEKÁVANÉ SOUBORY ---
+        function otevritUlozitProfil() {
+            if (!operaceData.length) {
+                alert('Nemáš přidané žádné kroky k uložení!');
+                return;
+            }
+
+            const aliasy = souboryData.map(s => s.alias).filter(Boolean);
+
+            const html = `
+                <div class="space-y-3">
+                    <div>
+                        <label class="font-semibold block mb-1">Název profilu:</label>
+                        <input type="text" id="prof_nazev" placeholder="Např. Zpracování zakázek 2026" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="font-semibold block mb-1">Popis profilu (volitelné):</label>
+                        <textarea id="prof_popis" rows="2" placeholder="Stručný popis toho, co tento profil dělá..." class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    </div>
+                    <div class="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500">
+                        <span class="font-bold text-[11px] block mb-0.5">Použité soubory v profilu:</span>
+                        <span class="text-xs text-indigo-600 dark:text-indigo-400 font-medium">${aliasy.join(', ') || 'Žádné'}</span>
+                    </div>
+                </div>
+            `;
+
+            const footer = `<button onclick="potvrditUlozeniProfilu()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs">Uložit profil</button>`;
+            otevritModal('Uložit aktuální konfiguraci', html, footer, '');
+        }
+
+        function potvrditUlozeniProfilu() {
+            const nazev = document.getElementById('prof_nazev').value.trim();
+            const popis = document.getElementById('prof_popis').value.trim();
+            if (!nazev) {
+                alert('Musíš zadat název profilu!');
+                return;
+            }
+
+            const profily = JSON.parse(localStorage.getItem(PROFILY_KEY) || '{}');
+            profily[nazev] = {
+                popis: popis || 'Bez popisu',
+                pouzite_soubory: souboryData.map(s => s.alias).filter(Boolean),
+                kroky: operaceData
+            };
+            localStorage.setItem(PROFILY_KEY, JSON.stringify(profily));
+            zavritModal();
+            alert(`Profil '${nazev}' byl úspěšně uložen!`);
+        }
+
+        function otevritNacistProfil() {
+            const profily = JSON.parse(localStorage.getItem(PROFILY_KEY) || '{}');
+            const keys = Object.keys(profily);
+            if (!keys.length) {
+                alert('Zatím nemáš uložené žádné konfigurace profilů.');
+                return;
+            }
+
+            const html = `
+                <div class="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    ${keys.map(k => {
+                        const item = profily[k];
+                        const pData = Array.isArray(item) ? { popis: 'Bez popisu', pouzite_soubory: [], kroky: item } : item;
+                        return `
+                            <div class="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-2">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="font-bold text-xs text-slate-800 dark:text-slate-200">${k}</span>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 italic mt-0.5">${pData.popis}</p>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <button onclick="nacistProfil('${k}')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold px-3 py-1.5 rounded-xl transition">Načíst</button>
+                                        <button onclick="upravitProfilPrompt('${k}')" class="px-2 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-[11px]">✏</button>
+                                        <button onclick="smazatProfil('${k}')" class="w-7 h-7 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-bold rounded-xl text-xs">✕</button>
+                                    </div>
+                                </div>
+                                <div class="text-[10px] text-slate-400 border-t border-slate-200/50 dark:border-slate-800/50 pt-1.5">
+                                    Očekávané soubory: <span class="text-indigo-600 dark:text-indigo-400 font-medium">${(pData.pouzite_soubory || []).join(', ') || 'Neuvedeno'}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            otevritModal('Správa a načítání profilů', html, '', '');
+        }
+
+        function nacistProfil(k) {
+            const profily = JSON.parse(localStorage.getItem(PROFILY_KEY) || '{}');
+            const item = profily[k];
+            operaceData = Array.isArray(item) ? item : item.kroky;
+            vykreslitKroky();
+            zavritModal();
+            alert(`Profil '${k}' byl načten!`);
+        }
+
+        function upravitProfilPrompt(staryNazev) {
+            const profily = JSON.parse(localStorage.getItem(PROFILY_KEY) || '{}');
+            const item = profily[staryNazev];
+            const pData = Array.isArray(item) ? { popis: '', pouzite_soubory: [], kroky: item } : item;
+
+            const novyNazev = prompt('Upravit název profilu:', staryNazev);
+            if (!novyNazev) return;
+            const novyPopis = prompt('Upravit popis profilu:', pData.popis || '');
+
+            delete profily[staryNazev];
+            profily[novyNazev] = {
+                popis: novyPopis || 'Bez popisu',
+                pouzite_soubory: pData.pouzite_soubory || [],
+                kroky: pData.kroky
+            };
+            localStorage.setItem(PROFILY_KEY, JSON.stringify(profily));
+            otevritNacistProfil();
+        }
+
+        function smazatProfil(k) {
+            if (!confirm(`Opravdu smazat profil '${k}'?`)) return;
+            const profily = JSON.parse(localStorage.getItem(PROFILY_KEY) || '{}');
+            delete profily[k];
+            localStorage.setItem(PROFILY_KEY, JSON.stringify(profily));
+            otevritNacistProfil();
+        }
+
+        pridatSouborUI();
+    </script>
+</body>
+</html>
