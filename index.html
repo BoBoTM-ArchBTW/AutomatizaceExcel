@@ -191,7 +191,6 @@
             <div class="px-8 py-5 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 rounded-t-3xl relative">
                 <div class="flex items-center gap-2.5">
                     <h3 id="modalTitle" class="font-bold text-base text-slate-900 dark:text-white">Nastavení operace</h3>
-                    <!-- Info Hover Ikona -->
                     <div id="modalInfoIcon" class="relative group cursor-pointer">
                         <span class="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 hover:bg-indigo-200 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center transition">
                             i
@@ -222,8 +221,8 @@
                 priklad: "Příklad: Najde P/N 'ABC-123' a ze sloupce 'Cena' u Zákazníka zapíše hodnotu do sloupce 'Nákupní cena' v Naší šabloně."
             },
             "Kopírování sloupců podle P/N + Filtr": {
-                popis: "Spáruje řádky podle identifikačního kódu a překopíruje sloupce pouze tehdy, když ověřovací sloupec v cílové tabulce obsahuje zadaný text.",
-                priklad: "Příklad: Překopíruje data pouze do těch řádků, kde je ve sloupci 'Zákazník' text 'IAM'."
+                popis: "Spáruje řádky podle identifikačního kódu a překopíruje sloupce pouze tehdy, když cílový řádek splňuje zvolené podmínky filtrů.",
+                priklad: "Příklad: Můžete nastavit, že sloupec 'Zákazník' musí obsahovat 'IAM' A ZÁROVEŇ sloupec 'Stav' nesmí obsahovat 'Storno'."
             },
             "Procentuální rozdělení zákazník + IAM / OE / OES": {
                 popis: "Sečte hodnoty ze zadaných pololetí. Pokud text příjemce obsahuje zadanou interní zkratku (např. '/MA'), zapíše 100 % do řádku IAM. V opačném případě rozdělí součet na 30 % do řádku OE a 70 % do řádku OES.",
@@ -507,10 +506,10 @@
                 operace: Object.keys(DEFINICE_OPERACI)[0],
                 src_file: prvniAlias, dst_file: druhyAlias, target_file: prvniAlias,
                 klic_src: '', klic_dst: '', konec_col: '', mapovani_rules: [],
-                k1_src: '', k1_dst: '', k2_src: '', k2_dst: '',
                 klic1: '', klic2: '', vybrany_sloupec: '', hodnota_naplneni: '',
                 vlozeny_text: 'kategorie', filter_text: '/MA',
-                filter_col: '', filter_val: '',
+                filter_mode: 'all', // 'all', 'any', 'none', 'and_not'
+                filter_rules: [],
                 m_cat: 'IAM', m_pct: 100, e1_cat: 'OE', e1_pct: 30, e2_cat: 'OES', e2_pct: 70
             });
             vykreslitKroky();
@@ -647,9 +646,6 @@
             const kdst = document.getElementById('modal_kdst') || document.getElementById('p_pn_dst') || document.getElementById('f_kdst');
             if (kdst) kdst.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
-            const f_col = document.getElementById('f_filter_col');
-            if (f_col) f_col.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
-
             const cat = document.getElementById('p_cat');
             if (cat) cat.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -660,6 +656,10 @@
                 const srcAlias = document.getElementById('modal_src')?.value || document.getElementById('f_src_file')?.value;
                 const srcCols = ziskatSloupceSouboru(srcAlias);
                 vykreslitMapovaniDvojice(srcCols, dstCols);
+            }
+
+            if (window.currentFilterRules) {
+                vykreslitFiltryDvojice(dstCols);
             }
         }
 
@@ -745,20 +745,21 @@
                         </div>
                     </div>
                     
+                    <!-- DYNAMICKÉ FILTRY -->
                     <div class="border-t border-slate-100 dark:border-slate-800 pt-5">
-                        <span class="font-bold text-xs text-indigo-600 dark:text-indigo-400 block mb-2.5">Filtr v cílovém souboru:</span>
-                        <div class="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
-                            <div>
-                                <label class="font-semibold block mb-1.5 text-slate-700 dark:text-slate-300">Ověřovací sloupec v cíli:</label>
-                                <select id="f_filter_col" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
-                                    ${dstCols.map(c => `<option value="${c}" ${c === o.filter_col ? 'selected' : ''}>${c}</option>`).join('')}
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-xs text-indigo-600 dark:text-indigo-400">🔍 Podmíněné filtry v cíli:</span>
+                                <select id="f_filter_mode" onchange="zmenaFilterMode(this.value)" class="border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-2.5 py-1 rounded-xl text-[11px] font-semibold outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="all" ${(o.filter_mode === 'all' || !o.filter_mode) ? 'selected' : ''}>Musí splnit: Všechny filtry (AND)</option>
+                                    <option value="any" ${o.filter_mode === 'any' ? 'selected' : ''}>Musí splnit: Alespoň jeden (OR)</option>
+                                    <option value="none" ${o.filter_mode === 'none' ? 'selected' : ''}>Nesmí splnit: Žádný z filtrů (NOT)</option>
+                                    <option value="and_not" ${o.filter_mode === 'and_not' ? 'selected' : ''}>1. Musí splnit AND 2. Nesmí splnit</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="font-semibold block mb-1.5 text-slate-700 dark:text-slate-300">Text, který musí obsahovat:</label>
-                                <input type="text" id="f_filter_val" value="${o.filter_val || ''}" placeholder="Např. IAM" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
-                            </div>
+                            <button id="btn_add_filter" onclick="pridatDvojiciFiltru()" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold rounded-xl text-xs transition">+ Přidat filtr</button>
                         </div>
+                        <div id="filtryContainer" class="space-y-3 max-h-48 overflow-y-auto pr-1"></div>
                     </div>
 
                     <div class="border-t border-slate-100 dark:border-slate-800 pt-5">
@@ -775,6 +776,18 @@
 
                 window.currentMapRules = o.mapovani_rules.length ? [...o.mapovani_rules] : [{ src: srcCols[0] || '', dst: dstCols[0] || '' }];
                 vykreslitMapovaniDvojice(srcCols, dstCols);
+
+                // Načtení stávajících filtrů (nebo konverze ze staršího formátu s jedním filtrem)
+                if (o.filter_rules && o.filter_rules.length) {
+                    window.currentFilterRules = JSON.parse(JSON.stringify(o.filter_rules));
+                } else if (o.filter_col) {
+                    window.currentFilterRules = [{ col: o.filter_col, val: o.filter_val || '' }];
+                } else {
+                    window.currentFilterRules = [{ col: dstCols[0] || '', val: '' }];
+                }
+
+                vykreslitFiltryDvojice(dstCols);
+                aktualizovatStavPridatFiltr();
 
             } else if (o.operace === 'Procentuální rozdělení zákazník + IAM / OE / OES') {
                 const srcCols = ziskatSloupceSouboru(o.src_file);
@@ -928,6 +941,93 @@
             vykreslitMapovaniDvojice(srcCols, dstCols);
         }
 
+        // --- FILTRY LOGIKA PRO P/N + FILTR ---
+        function zmenaFilterMode(mode) {
+            const dstCols = ziskatSloupceSouboru(document.getElementById('f_dst_file').value);
+            if (mode === 'and_not') {
+                if (window.currentFilterRules.length > 2) {
+                    window.currentFilterRules = window.currentFilterRules.slice(0, 2);
+                } else if (window.currentFilterRules.length < 2) {
+                    while (window.currentFilterRules.length < 2) {
+                        window.currentFilterRules.push({ col: dstCols[0] || '', val: '' });
+                    }
+                }
+            }
+            vykreslitFiltryDvojice(dstCols);
+            aktualizovatStavPridatFiltr();
+        }
+
+        function aktualizovatStavPridatFiltr() {
+            const mode = document.getElementById('f_filter_mode')?.value || 'all';
+            const btn = document.getElementById('btn_add_filter');
+            if (!btn) return;
+            if (mode === 'and_not') {
+                btn.disabled = true;
+                btn.classList.add('opacity-40', 'cursor-not-allowed');
+                btn.title = "Podmínka 'První ANO, Druhý NE' vyžaduje přesně 2 filtry.";
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-40', 'cursor-not-allowed');
+                btn.title = "";
+            }
+        }
+
+        function vykreslitFiltryDvojice(dstCols) {
+            const container = document.getElementById('filtryContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const mode = document.getElementById('f_filter_mode')?.value || 'all';
+
+            window.currentFilterRules.forEach((f, idx) => {
+                let badgeText = `Filtr ${idx + 1}:`;
+                let badgeClass = "text-slate-500 bg-slate-100 dark:bg-slate-800";
+
+                if (mode === 'and_not') {
+                    if (idx === 0) {
+                        badgeText = "1. Musí obsahovat (ANO):";
+                        badgeClass = "text-emerald-700 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300";
+                    } else {
+                        badgeText = "2. Nesmí obsahovat (NE):";
+                        badgeClass = "text-rose-700 bg-rose-100 dark:bg-rose-950 dark:text-rose-300";
+                    }
+                } else if (mode === 'none') {
+                    badgeText = `Nesmí obsahovat ${idx + 1}:`;
+                    badgeClass = "text-rose-700 bg-rose-100 dark:bg-rose-950 dark:text-rose-300";
+                }
+
+                const div = document.createElement('div');
+                div.className = 'flex flex-col sm:flex-row gap-2.5 items-start sm:items-center bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 text-xs';
+                div.innerHTML = `
+                    <span class="font-bold text-[10px] px-2 py-0.5 rounded-md ${badgeClass} whitespace-nowrap">${badgeText}</span>
+                    <select onchange="window.currentFilterRules[${idx}].col = this.value" class="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl flex-1 outline-none focus:ring-2 focus:ring-indigo-500">
+                        ${dstCols.map(c => `<option value="${c}" ${c === f.col ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                    <input type="text" value="${f.val || ''}" oninput="window.currentFilterRules[${idx}].val = this.value" placeholder="Hledaný text (např. IAM)" class="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl flex-1 outline-none focus:ring-2 focus:ring-indigo-500">
+                    ${(mode !== 'and_not' && window.currentFilterRules.length > 1) ? `
+                        <button onclick="smazatDvojiciFiltru(${idx})" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center font-bold text-xs transition flex-shrink-0">✕</button>
+                    ` : ''}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function pridatDvojiciFiltru() {
+            const mode = document.getElementById('f_filter_mode')?.value || 'all';
+            if (mode === 'and_not') return;
+            const dstCols = ziskatSloupceSouboru(document.getElementById('f_dst_file').value);
+            window.currentFilterRules.push({ col: dstCols[0] || '', val: '' });
+            vykreslitFiltryDvojice(dstCols);
+        }
+
+        function smazatDvojiciFiltru(idx) {
+            const mode = document.getElementById('f_filter_mode')?.value || 'all';
+            if (mode === 'and_not') return;
+            window.currentFilterRules.splice(idx, 1);
+            const dstCols = ziskatSloupceSouboru(document.getElementById('f_dst_file').value);
+            vykreslitFiltryDvojice(dstCols);
+        }
+
         function ulozitMapovani1(id) {
             const o = operaceData.find(x => x.id === id);
             o.src_file = document.getElementById('modal_src').value;
@@ -944,8 +1044,8 @@
             o.dst_file = document.getElementById('f_dst_file').value;
             o.klic_src = document.getElementById('f_ksrc').value;
             o.klic_dst = document.getElementById('f_kdst').value;
-            o.filter_col = document.getElementById('f_filter_col').value;
-            o.filter_val = document.getElementById('f_filter_val').value;
+            o.filter_mode = document.getElementById('f_filter_mode').value;
+            o.filter_rules = window.currentFilterRules;
             o.mapovani_rules = window.currentMapRules;
             zavritModal();
         }
@@ -1087,8 +1187,8 @@
                         const dstRows = dfs[o.dst_file];
                         if (!srcRows || !dstRows || !o.klic_src || !o.klic_dst) return;
 
-                        const f_col = o.filter_col;
-                        const f_val = String(o.filter_val || '').trim();
+                        const mode = o.filter_mode || 'all';
+                        const fRules = (o.filter_rules && o.filter_rules.length) ? o.filter_rules : (o.filter_col ? [{ col: o.filter_col, val: o.filter_val }] : []);
 
                         const mapa = {};
                         srcRows.forEach(sr => {
@@ -1099,11 +1199,47 @@
                         dstRows.forEach(dr => {
                             const k = String(dr[o.klic_dst] !== undefined ? dr[o.klic_dst] : '').trim().toLowerCase();
                             
+                            // Vyhodnocení filtru podle nastaveného režimu
                             let filterPassed = true;
-                            if (f_col) {
-                                const targetCellVal = String(dr[f_col] !== undefined ? dr[f_col] : '');
-                                if (f_val && !targetCellVal.includes(f_val)) {
-                                    filterPassed = false;
+
+                            if (fRules.length > 0) {
+                                if (mode === 'all') {
+                                    filterPassed = fRules.every(fr => {
+                                        const cellVal = String(dr[fr.col] !== undefined ? dr[fr.col] : '').trim();
+                                        const reqVal = String(fr.val || '').trim();
+                                        return reqVal === '' || cellVal.includes(reqVal);
+                                    });
+                                } else if (mode === 'any') {
+                                    const activeRules = fRules.filter(fr => String(fr.val || '').trim() !== '');
+                                    if (activeRules.length > 0) {
+                                        filterPassed = activeRules.some(fr => {
+                                            const cellVal = String(dr[fr.col] !== undefined ? dr[fr.col] : '').trim();
+                                            return cellVal.includes(String(fr.val).trim());
+                                        });
+                                    } else {
+                                        filterPassed = true;
+                                    }
+                                } else if (mode === 'none') {
+                                    filterPassed = fRules.every(fr => {
+                                        const reqVal = String(fr.val || '').trim();
+                                        if (!reqVal) return true;
+                                        const cellVal = String(dr[fr.col] !== undefined ? dr[fr.col] : '').trim();
+                                        return !cellVal.includes(reqVal);
+                                    });
+                                } else if (mode === 'and_not') {
+                                    const r1 = fRules[0];
+                                    const r2 = fRules[1];
+                                    
+                                    let p1 = true, p2 = true;
+                                    if (r1 && String(r1.val || '').trim() !== '') {
+                                        const c1 = String(dr[r1.col] !== undefined ? dr[r1.col] : '').trim();
+                                        p1 = c1.includes(String(r1.val).trim());
+                                    }
+                                    if (r2 && String(r2.val || '').trim() !== '') {
+                                        const c2 = String(dr[r2.col] !== undefined ? dr[r2.col] : '').trim();
+                                        p2 = !c2.includes(String(r2.val).trim());
+                                    }
+                                    filterPassed = p1 && p2;
                                 }
                             }
 
