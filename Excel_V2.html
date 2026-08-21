@@ -184,7 +184,7 @@
         </div>
     </main>
 
-    <!-- ================= MODAL / POP-UP (ZVĚTŠENO NA max-w-3xl) ================= -->
+    <!-- ================= MODAL / POP-UP ================= -->
     <div id="modalOverlay" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 transition-opacity duration-300">
         <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800/80 w-full max-w-3xl max-h-[90vh] flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
             <!-- Modal Header -->
@@ -196,14 +196,13 @@
                         <span class="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 hover:bg-indigo-200 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center transition">
                             i
                         </span>
-                        <!-- Tooltip s vysokým Z-Indexem nad vším -->
                         <div id="modalTooltip" class="absolute left-0 top-8 w-96 p-4 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-2xl text-xs leading-relaxed hidden group-hover:block z-[100] pointer-events-none border border-slate-700"></div>
                     </div>
                 </div>
                 <button onclick="zavritModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm transition">✕</button>
             </div>
             
-            <!-- Modal Content (Více prostoru a paddingu) -->
+            <!-- Modal Content -->
             <div id="modalContent" class="p-8 overflow-y-auto space-y-6 text-xs"></div>
             <!-- Modal Footer -->
             <div id="modalFooter" class="px-8 py-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-3xl flex justify-end gap-3"></div>
@@ -616,8 +615,10 @@
 
             const c1 = document.getElementById('gen_col1');
             const c2 = document.getElementById('gen_col2');
+            const cEnd = document.getElementById('gen_konec_col');
             if (c1) c1.innerHTML = optHtml;
             if (c2) c2.innerHTML = optHtml;
+            if (cEnd) cEnd.innerHTML = `<option value="">-- Vyplnit všechny řádky tabulky --</option>` + optHtml;
         }
 
         function modalZmenaSrc(srcAlias) {
@@ -843,8 +844,18 @@
                     specificHtml = `
                         <label class="font-semibold block mb-1.5 text-slate-700 dark:text-slate-300">Vyber sloupec k naplnění:</label>
                         <select id="gen_col1" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 mb-4">${tCols.map(c => `<option value="${c}" ${c === o.vybrany_sloupec ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        
                         <label class="font-semibold block mb-1.5 text-slate-700 dark:text-slate-300">Zadávaná hodnota / Text:</label>
-                        <input type="text" id="gen_val" value="${o.hodnota_naplneni}" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="gen_val" value="${o.hodnota_naplneni}" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
+
+                        <div class="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
+                            <label class="font-semibold block mb-1 text-slate-700 dark:text-slate-300">Konec vyplnění podle jiného sloupce (volitelné):</label>
+                            <p class="text-[10px] text-slate-400 mb-2">Vyplní řádky pouze potud, dokud má vybraný kontrolní sloupec neprázdnou hodnotu.</p>
+                            <select id="gen_konec_col" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="">-- Vyplnit všechny řádky tabulky --</option>
+                                ${tCols.map(c => `<option value="${c}" ${c === o.konec_col ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
                     `;
                 } else if (o.operace === 'Přičíst hodnotu z jednoho sloupce do druhého') {
                     specificHtml = `
@@ -960,6 +971,7 @@
             if (document.getElementById('gen_col1')) o.vybrany_sloupec = document.getElementById('gen_col1').value;
             if (document.getElementById('gen_col1')) o.klic1 = document.getElementById('gen_col1').value;
             if (document.getElementById('gen_col2')) o.klic2 = document.getElementById('gen_col2').value;
+            if (document.getElementById('gen_konec_col')) o.konec_col = document.getElementById('gen_konec_col').value;
             if (document.getElementById('gen_val')) {
                 o.hodnota_naplneni = document.getElementById('gen_val').value;
                 o.vlozeny_text = document.getElementById('gen_val').value;
@@ -1148,7 +1160,18 @@
 
                     } else if (o.operace === 'Vyplnit sloupec stejnou hodnotou') {
                         const target = dfs[o.target_file];
-                        if (target) target.forEach(r => r[o.vybrany_sloupec] = o.hodnota_naplneni);
+                        if (target) {
+                            target.forEach(r => {
+                                if (o.konec_col) {
+                                    const checkVal = r[o.konec_col];
+                                    if (checkVal !== undefined && checkVal !== null && String(checkVal).trim() !== '') {
+                                        r[o.vybrany_sloupec] = o.hodnota_naplneni;
+                                    }
+                                } else {
+                                    r[o.vybrany_sloupec] = o.hodnota_naplneni;
+                                }
+                            });
+                        }
                     }
                 });
 
