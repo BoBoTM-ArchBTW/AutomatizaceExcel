@@ -995,8 +995,15 @@
                 cell.v = val;
                 cell.t = 'b';
             } else {
-                cell.v = String(val);
-                cell.t = 's';
+                const strVal = String(val).trim();
+                const numVal = Number(strVal.replace(',', '.'));
+                if (strVal !== '' && !isNaN(numVal) && !strVal.startsWith('0') && !strVal.includes('/')) {
+                    cell.v = numVal;
+                    cell.t = 'n';
+                } else {
+                    cell.v = strVal;
+                    cell.t = 's';
+                }
             }
         }
 
@@ -1022,9 +1029,12 @@
                             } else {
                                 Object.keys(r).forEach(col => {
                                     if (col !== key && col !== '_excel_row') {
-                                        const num = parseFloat(r[col]);
+                                        const rawNum = String(r[col]).replace(',', '.');
+                                        const num = parseFloat(rawNum);
                                         if (!isNaN(num)) {
-                                            grouped[kVal][col] = (parseFloat(grouped[kVal][col]) || 0) + num;
+                                            const existingRaw = String(grouped[kVal][col] || '0').replace(',', '.');
+                                            const existing = parseFloat(existingRaw) || 0;
+                                            grouped[kVal][col] = existing + num;
                                         }
                                     }
                                 });
@@ -1036,8 +1046,8 @@
                         const target = dfs[o.target_file];
                         if (!target) return;
                         target.forEach(r => {
-                            const sVal = parseFloat(r[o.klic1]) || 0;
-                            const dVal = parseFloat(r[o.klic2]) || 0;
+                            const sVal = parseFloat(String(r[o.klic1]).replace(',', '.')) || 0;
+                            const dVal = parseFloat(String(r[o.klic2]).replace(',', '.')) || 0;
                             r[o.klic2] = dVal + sVal;
                         });
 
@@ -1127,8 +1137,8 @@
 
                             const recVal = String(sr[o.rec_col] !== undefined ? sr[o.rec_col] : '').trim();
                             let sumVal = 0;
-                            if (o.sum1 && sr[o.sum1] !== undefined) sumVal += parseFloat(sr[o.sum1]) || 0;
-                            if (o.sum2 && o.sum2 !== '-- Žádný --' && sr[o.sum2] !== undefined) sumVal += parseFloat(sr[o.sum2]) || 0;
+                            if (o.sum1 && sr[o.sum1] !== undefined) sumVal += parseFloat(String(sr[o.sum1]).replace(',', '.')) || 0;
+                            if (o.sum2 && o.sum2 !== '-- Žádný --' && sr[o.sum2] !== undefined) sumVal += parseFloat(String(sr[o.sum2]).replace(',', '.')) || 0;
 
                             const isMatch = f_text && recVal.includes(f_text);
 
@@ -1138,7 +1148,7 @@
                                 const dstCat = String(dr[o.cat_col] !== undefined ? dr[o.cat_col] : '').trim().toUpperCase();
 
                                 if (dstPn === pn) {
-                                    const currVal = parseFloat(dr[o.val_col]) || 0;
+                                    const currVal = parseFloat(String(dr[o.val_col]).replace(',', '.')) || 0;
                                     if (isMatch) {
                                         if (dstCat === m_cat) {
                                             dr[o.val_col] = currVal + (sumVal * m_pct);
