@@ -106,7 +106,7 @@
             <!-- Seznam souborů -->
             <div id="seznamSouboru" class="grid grid-cols-1 gap-5"></div>
 
-            <button onclick="pridatSouborUI()" class="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-50/50 dark:bg-slate-900/20 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 transition-all flex items-center justify-center gap-2 group">
+            <button onclick="pridatSouborUI()" class="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 transition-all flex items-center justify-center gap-2 group">
                 <span class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 group-hover:bg-indigo-500 group-hover:text-white flex items-center justify-center transition-colors">+</span>
                 Přidat další soubor
             </button>
@@ -221,12 +221,12 @@
                 priklad: "Příklad: Najde P/N 'ABC-123' a ze sloupce 'Cena' u Zákazníka zapíše hodnotu do sloupce 'Nákupní cena' v Naší šabloně."
             },
             "Kopírování sloupců podle P/N + Filtr": {
-                popis: "Spáruje řádky podle identifikačního kódu a překopíruje sloupce pouze tehdy, když cílový řádek splňuje zvolené podmínky filtrů.",
-                priklad: "Příklad: Můžete nastavit, že sloupec 'Zákazník' musí obsahovat 'IAM' A ZÁROVEŇ sloupec 'Stav' nesmí obsahovat 'Storno'."
+                popis: "Spáruje řádky podle identifikačního kódu a překopíruje sloupce pouze tehdy, když ověřovací sloupec v cílové tabulce obsahuje zadaný text.",
+                priklad: "Příklad: Překopíruje data pouze do těch řádků, kde je ve sloupci 'Zákazník' text 'IAM'."
             },
             "Procentuální rozdělení zákazník + IAM / OE / OES": {
-                popis: "Sečte hodnoty ze zadaných pololetí. Pokud text příjemce obsahuje zadanou interní zkratku (např. '/MA'), zapíše 100 % do řádku IAM. V opačném případě rozdělí součet na 30 % do řádku OE a 70 % do řádku OES.",
-                priklad: "Příklad: Součet pololetí je 100 ks. Pro 'Klient/MA' zapíše 100 ks do IAM. Pro 'Běžný klient' zapíše 30 ks do OE a 70 ks do OES."
+                popis: "Sečte hodnoty ze zadaných pololetí. Pokud text příjemce obsahuje zadanou interní zkratku (např. '/MA'), zapíše zadané procento do kategorie IAM. V opačném případě rozpočítá procenta mezi zvolené kategorie (např. OE a OES).",
+                priklad: "Příklad: Součet pololetí je 100 ks. Pro 'Klient/MA' zapíše 100 % do IAM. Pro 'Běžný klient' zapíše 30 % do OE a 70 % do OES."
             },
             "Sloučit texty z více sloupců": {
                 popis: "Vezme text z cílového sloupce a na jeho konec připojí volitelnou předponu a text ze zdrojového sloupce.",
@@ -250,7 +250,6 @@
             }
         };
 
-        // --- NASTAVENÍ VELIKOSTI TEXTU ---
         function initFontSize() {
             const savedSize = localStorage.getItem(FONT_SIZE_KEY) || '100%';
             document.documentElement.style.fontSize = savedSize;
@@ -263,7 +262,6 @@
             localStorage.setItem(FONT_SIZE_KEY, val);
         }
 
-        // --- DARK MODE LOGIKA ---
         function initTheme() {
             const isDark = localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
             document.documentElement.classList.toggle('dark', isDark);
@@ -506,11 +504,12 @@
                 operace: Object.keys(DEFINICE_OPERACI)[0],
                 src_file: prvniAlias, dst_file: druhyAlias, target_file: prvniAlias,
                 klic_src: '', klic_dst: '', konec_col: '', mapovani_rules: [],
+                k1_src: '', k1_dst: '', k2_src: '', k2_dst: '',
                 klic1: '', klic2: '', vybrany_sloupec: '', hodnota_naplneni: '',
                 vlozeny_text: 'kategorie', filter_text: '/MA',
-                filter_mode: 'all', // 'all', 'any', 'none', 'and_not'
+                filter_mode: 'all',
                 filter_rules: [],
-                m_cat: 'IAM', m_pct: 100, e1_cat: 'OE', e1_pct: 30, e2_cat: 'OES', e2_pct: 70
+                m_cat: 'IAM', m_pct: '100', e1_cat: 'OE', e1_pct: '30', e2_cat: 'OES', e2_pct: '70'
             });
             vykreslitKroky();
         }
@@ -635,7 +634,7 @@
             if (sum2) sum2.innerHTML = `<option value="">-- Žádný --</option>` + srcCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
             if (window.currentMapRules) {
-                const dstAlias = document.getElementById('modal_dst')?.value || document.getElementById('f_dst_file')?.value;
+                const dstAlias = document.getElementById('modal_dst')?.value || document.getElementById('f_dst_file')?.value || document.getElementById('p_dst')?.value;
                 const dstCols = ziskatSloupceSouboru(dstAlias);
                 vykreslitMapovaniDvojice(srcCols, dstCols);
             }
@@ -646,6 +645,9 @@
             const kdst = document.getElementById('modal_kdst') || document.getElementById('p_pn_dst') || document.getElementById('f_kdst');
             if (kdst) kdst.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
+            const f_col = document.getElementById('f_filter_col');
+            if (f_col) f_col.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
+
             const cat = document.getElementById('p_cat');
             if (cat) cat.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -653,7 +655,7 @@
             if (val) val.innerHTML = dstCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
             if (window.currentMapRules) {
-                const srcAlias = document.getElementById('modal_src')?.value || document.getElementById('f_src_file')?.value;
+                const srcAlias = document.getElementById('modal_src')?.value || document.getElementById('f_src_file')?.value || document.getElementById('p_src')?.value;
                 const srcCols = ziskatSloupceSouboru(srcAlias);
                 vykreslitMapovaniDvojice(srcCols, dstCols);
             }
@@ -745,7 +747,6 @@
                         </div>
                     </div>
                     
-                    <!-- DYNAMICKÉ FILTRY -->
                     <div class="border-t border-slate-100 dark:border-slate-800 pt-5">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                             <div class="flex items-center gap-2">
@@ -777,7 +778,6 @@
                 window.currentMapRules = o.mapovani_rules.length ? [...o.mapovani_rules] : [{ src: srcCols[0] || '', dst: dstCols[0] || '' }];
                 vykreslitMapovaniDvojice(srcCols, dstCols);
 
-                // Načtení stávajících filtrů (nebo konverze ze staršího formátu s jedním filtrem)
                 if (o.filter_rules && o.filter_rules.length) {
                     window.currentFilterRules = JSON.parse(JSON.stringify(o.filter_rules));
                 } else if (o.filter_col) {
@@ -812,6 +812,7 @@
                             <select id="p_pn_dst" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">${dstCols.map(c => `<option value="${c}" ${c === o.pn_dst ? 'selected' : ''}>${c}</option>`).join('')}</select>
                         </div>
                     </div>
+                    
                     <div class="border-t border-slate-100 dark:border-slate-800 pt-5 grid grid-cols-2 gap-5">
                         <div>
                             <label class="font-semibold block mb-1.5 text-slate-700 dark:text-slate-300">Sloupec s příjemcem (např. Delivery Customer):</label>
@@ -830,6 +831,7 @@
                             <select id="p_sum2" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500"><option value="">-- Žádný --</option>${srcCols.map(c => `<option value="${c}" ${c === o.sum2 ? 'selected' : ''}>${c}</option>`).join('')}</select>
                         </div>
                     </div>
+
                     <div class="border-t border-slate-100 dark:border-slate-800 pt-5 grid grid-cols-2 gap-5">
                         <div>
                             <label class="font-semibold block mb-1.5 text-slate-700 dark:text-slate-300">Cílový sloupec kategorie (např. Sales Channel):</label>
@@ -838,6 +840,61 @@
                         <div>
                             <label class="font-semibold block mb-1.5 text-slate-700 dark:text-slate-300">Cílový hodnotový sloupec (např. 2026):</label>
                             <select id="p_val" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">${dstCols.map(c => `<option value="${c}" ${c === o.val_col ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                        </div>
+                    </div>
+
+                    <!-- PROCENTUÁLNÍ ROZDĚLENÍ -->
+                    <div class="border-t border-slate-100 dark:border-slate-800 pt-5 space-y-3">
+                        <span class="font-bold text-xs text-indigo-600 dark:text-indigo-400 block">📊 Pravidla rozdělení do kategorií:</span>
+                        
+                        <div class="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 space-y-2">
+                            <label class="font-semibold text-slate-700 dark:text-slate-300 block text-[11px]">Pokud obsahuje hledaný text (interní):</label>
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1">
+                                    <span class="text-[10px] text-slate-400 block mb-1">Kategorie v cíli:</span>
+                                    <input type="text" id="p_m_cat" value="${o.m_cat || 'IAM'}" placeholder="IAM" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div class="w-24">
+                                    <span class="text-[10px] text-slate-400 block mb-1">Procento:</span>
+                                    <div class="flex items-center gap-1">
+                                        <input type="number" id="p_m_pct" value="${o.m_pct !== undefined ? o.m_pct : '100'}" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-right">
+                                        <span class="text-xs text-slate-500 font-bold">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 space-y-2">
+                            <label class="font-semibold text-slate-700 dark:text-slate-300 block text-[11px]">Ostatní (pokud hledaný text neobsahuje):</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1">
+                                        <span class="text-[10px] text-slate-400 block mb-1">1. Kategorie:</span>
+                                        <input type="text" id="p_e1_cat" value="${o.e1_cat || 'OE'}" placeholder="OE" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="w-20">
+                                        <span class="text-[10px] text-slate-400 block mb-1">Podíl:</span>
+                                        <div class="flex items-center gap-1">
+                                            <input type="number" id="p_e1_pct" value="${o.e1_pct !== undefined ? o.e1_pct : '30'}" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-right">
+                                            <span class="text-xs text-slate-500 font-bold">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1">
+                                        <span class="text-[10px] text-slate-400 block mb-1">2. Kategorie:</span>
+                                        <input type="text" id="p_e2_cat" value="${o.e2_cat || 'OES'}" placeholder="OES" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="w-20">
+                                        <span class="text-[10px] text-slate-400 block mb-1">Podíl:</span>
+                                        <div class="flex items-center gap-1">
+                                            <input type="number" id="p_e2_pct" value="${o.e2_pct !== undefined ? o.e2_pct : '70'}" class="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-right">
+                                            <span class="text-xs text-slate-500 font-bold">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -941,7 +998,6 @@
             vykreslitMapovaniDvojice(srcCols, dstCols);
         }
 
-        // --- FILTRY LOGIKA PRO P/N + FILTR ---
         function zmenaFilterMode(mode) {
             const dstCols = ziskatSloupceSouboru(document.getElementById('f_dst_file').value);
             if (mode === 'and_not') {
@@ -1062,6 +1118,15 @@
             o.sum2 = document.getElementById('p_sum2').value;
             o.cat_col = document.getElementById('p_cat').value;
             o.val_col = document.getElementById('p_val').value;
+
+            // Uložení procentuálních pravidel
+            o.m_cat = document.getElementById('p_m_cat').value.trim();
+            o.m_pct = document.getElementById('p_m_pct').value.trim();
+            o.e1_cat = document.getElementById('p_e1_cat').value.trim();
+            o.e1_pct = document.getElementById('p_e1_pct').value.trim();
+            o.e2_cat = document.getElementById('p_e2_cat').value.trim();
+            o.e2_pct = document.getElementById('p_e2_pct').value.trim();
+
             zavritModal();
         }
 
@@ -1199,7 +1264,6 @@
                         dstRows.forEach(dr => {
                             const k = String(dr[o.klic_dst] !== undefined ? dr[o.klic_dst] : '').trim().toLowerCase();
                             
-                            // Vyhodnocení filtru podle nastaveného režimu
                             let filterPassed = true;
 
                             if (fRules.length > 0) {
@@ -1259,11 +1323,11 @@
 
                         const f_text = String(o.filter_text || '').trim();
                         const m_cat = String(o.m_cat || 'IAM').trim().toUpperCase();
-                        const m_pct = (parseFloat(o.m_pct) || 100) / 100.0;
+                        const m_pct = (parseFloat(String(o.m_pct).replace(',', '.')) || 100) / 100.0;
                         const e1_cat = String(o.e1_cat || 'OE').trim().toUpperCase();
-                        const e1_pct = (parseFloat(o.e1_pct) || 30) / 100.0;
+                        const e1_pct = (parseFloat(String(o.e1_pct).replace(',', '.')) || 30) / 100.0;
                         const e2_cat = String(o.e2_cat || 'OES').trim().toUpperCase();
-                        const e2_pct = (parseFloat(o.e2_pct) || 70) / 100.0;
+                        const e2_pct = (parseFloat(String(o.e2_pct).replace(',', '.')) || 70) / 100.0;
 
                         srcRows.forEach(sr => {
                             const pn_raw = sr[o.pn_src];
